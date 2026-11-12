@@ -450,3 +450,66 @@ export function snapshot(): Snapshot {
   errors.push(...taskErrors);
   return { project, tasks, decisions: readDecisions(), git: readGit(), errors, generatedAt: now() };
 }
+
+// 教訓: うまくいかなかったことと、その対処。似た作業の前に recall で引き出して、同じ失敗を繰り返さないために残す
+export const Lesson = z.object({
+  id: z.string().regex(/^L-\d{3,}$/),
+  title: z.string().min(1),
+  problem: z.string().min(1),
+  cause: z.string().default(""),
+  fix: z.string().min(1),
+  task: z.string().nullable().default(null),
+  tags: z.array(z.string()).default([]),
+  created: z.string(),
+});
+export type Lesson = z.infer<typeof Lesson>;
+
+export const LessonInput = z.object({
+  title: z.string().trim().min(1).describe("何についての教訓か（1 行）"),
+  problem: z.string().trim().min(1).describe("何が起きたか、どう気づいたか"),
+  cause: z.string().optional().describe("原因"),
+  fix: z.string().trim().min(1).describe("どう対処したか。次に同じ場面でどうするか"),
+  task: z.string().nullable().optional().describe("関係するタスク ID"),
+  tags: z.array(z.string()).optional(),
+});
+
+function lessonsDir(): string {
+  return join(paths.dev(), "lessons");
+}
+
+export function readLessons(): { lessons: Lesson[]; errors: string[] } {
+  const dir = lessonsDir();
+  if (!existsSync(dir)) return { lessons: [], errors: [] };
+  const lessons: Lesson[] = [];
+  const errors: string[] = [];
+  for (const name of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    try {
+      lessons.push(Lesson.parse(JSON.parse(readFileSync(join(dir, name), "utf8"))));
+    } catch (e) {
+      errors.push(`dev/lessons/${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { lessons, errors };
+}
+
+export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
+  if (input.task) getTask(input.task);
+  const dir = lessonsDir();
+  mkdirSync(dir, { recursive: true });
+  const numbers = readdirSync(dir)
+    .map((f) => /^L-(\d+)\.json$/.exec(f)?.[1])
+    .filter((n): n is string => n !== undefined)
+    .map(Number);
+  const lesson = Lesson.parse({
+    id: `L-${String((numbers.length ? Math.max(...numbers) : 0) + 1).padStart(3, "0")}`,
+    title: input.title,
+    problem: input.problem,
+    cause: input.cause ?? "",
+    fix: input.fix,
+    task: input.task ?? null,
+    tags: input.tags ?? [],
+    created: now(),
+  });
+  writeJson(join(dir, `${lesson.id}.json`), lesson);
+  return lesson;
+}

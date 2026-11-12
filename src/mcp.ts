@@ -22,8 +22,13 @@ import {
   setDecisionStatus,
   readProject,
   writeProject,
+  LessonInput,
+  createLesson,
+  readLessons,
 } from "./store.ts";
 import { ensureServer } from "./launcher.ts";
+import { boardProblems } from "./lint.ts";
+import { buildDocs, recall } from "./recall.ts";
 
 const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッションを管理するデスクトップアプリ）の開発ボード。
 作業を始めるときは get_overview で現在のマイルストーン、進行中のタスク、次に着手できるタスク（next）、進められないタスク（stuck）を確認する。
@@ -84,6 +89,7 @@ server.registerTool(
         recentDecisions: s.decisions.slice(-5).map(({ number, title, status, date }) => ({ number, title, status, date })),
         git: s.git,
         errors: s.errors,
+        problems: boardProblems(),
       };
     }),
 );
@@ -253,6 +259,30 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   () => tool(() => ensureServer()),
+);
+
+server.registerTool(
+  "recall",
+  {
+    description:
+      "過去のタスク・決定記録・教訓から、質問に関係の深いものを探す。似た作業を始める前や、なぜそう決めたかを知りたいときに使う",
+    inputSchema: {
+      query: z.string().min(1).describe("探したいこと。日本語の文でよい"),
+      limit: z.number().int().positive().max(20).optional().describe("返す件数。既定は 5"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ query, limit }) => tool(() => recall(query, buildDocs(readTasks().tasks, readDecisions(), readLessons().lessons), limit ?? 5)),
+);
+
+server.registerTool(
+  "add_lesson",
+  {
+    description:
+      "教訓を dev/lessons/L-NNN.json に残す。うまくいかなかったこと、遠回りしたこと、環境の罠と、その対処を書く。次のセッションが recall で引き出す",
+    inputSchema: LessonInput.shape,
+  },
+  (input) => tool(() => createLesson(input)),
 );
 
 await server.connect(new StdioServerTransport());
