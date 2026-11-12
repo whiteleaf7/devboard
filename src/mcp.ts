@@ -34,7 +34,7 @@ const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッション
 作業に入るタスクは update_task で status を doing にし、区切りごとに note で経過を残す。結果は自分で確かめて done にする（ユーザーの確認待ちの review は使わない）。
 方針の判断も AI が行い、理由を create_decision か note に残す。AI に物理的にできないこと（ログイン、支払い、外部への公開など）だけ blocked にして、ユーザーにしてほしいことを note に書く。
 設計上の判断をしたら create_decision で docs/decisions/ に記録する（後から覆すときは新しい記録を作り、古い方を「置き換え」にする）。
-ユーザーに見せたいときは open_dashboard で URL を返す（ブラウザで開くのはユーザー）。`;
+ユーザーに見せたいときは、pnpm board:tailscale を実行して出力された Tailscale の URL を返す（ユーザーは別の端末から開く。ブラウザで開くのはユーザー）。Tailscale が動いていないときだけ open_dashboard のローカルの URL を返し、理由を添える。`;
 
 const server = new McpServer({ name: "nagaya-dev", version: "0.1.0" }, { instructions: INSTRUCTIONS });
 
