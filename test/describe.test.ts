@@ -1,0 +1,49 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { describeTasks, type Task } from "../src/store.ts";
+
+const base = { milestone: null, labels: [], description: "", branch: null, notes: [], createdBy: "ai" as const, created: "", updated: "" };
+const t = (id: string, fields: Partial<Task> = {}): Task => ({
+  ...base, id, title: id, status: "todo", parent: null, dependsOn: [], priority: "normal", ...fields,
+});
+
+test("未着手を依存と優先度の順に並べる", () => {
+  const view = describeTasks([
+    t("T-001"),
+    t("T-002", { dependsOn: ["T-003"] }),
+    t("T-003"),
+    t("T-004", { priority: "high", dependsOn: ["T-001"] }),
+  ]);
+  const order = Object.fromEntries(view.map((v) => [v.id, v.order]));
+  assert.deepEqual(order, { "T-001": 1, "T-004": 2, "T-003": 3, "T-002": 4 });
+  assert.deepEqual(view.filter((v) => v.ready).map((v) => v.id), ["T-001", "T-003"]);
+});
+
+test("確認待ちやブロックに依存するものは、たどった先まで stuck にする", () => {
+  const view = describeTasks([
+    t("T-001", { status: "review" }),
+    t("T-002", { dependsOn: ["T-001"] }),
+    t("T-003", { dependsOn: ["T-002"] }),
+    t("T-004", { dependsOn: ["T-999"] }),
+    t("T-005"),
+  ]);
+  const by = new Map(view.map((v) => [v.id, v]));
+  assert.match(by.get("T-002")!.stuck!, /T-001 が確認待ち/);
+  assert.match(by.get("T-003")!.stuck!, /T-002 経由/);
+  assert.match(by.get("T-004")!.stuck!, /存在しない/);
+  assert.equal(by.get("T-002")!.order, null);
+  assert.equal(by.get("T-005")!.order, 1);
+  assert.equal(by.get("T-005")!.stuck, null);
+});
+
+test("子を持つ親は着手対象にせず、子がすべて終われば closable にする", () => {
+  const view = describeTasks([
+    t("T-001"),
+    t("T-002", { parent: "T-001", status: "done" }),
+    t("T-003", { parent: "T-001", status: "cancelled" }),
+  ]);
+  const parent = view.find((v) => v.id === "T-001")!;
+  assert.equal(parent.ready, false);
+  assert.equal(parent.order, null);
+  assert.equal(parent.closable, true);
+});

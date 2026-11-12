@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f2" id="theme-color">
+<script>
+  // 描画前にテーマを当てて、ちらつきを防ぐ。既定はライト（OS の設定には合わせない）
+  document.documentElement.dataset.theme = localStorage.getItem("nagaya-devboard-theme") === "dark" ? "dark" : "light";
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>nagaya devboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --sub: #6b6862; --line: #e3e0da;
+    --todo: #8a8780; --doing: #2f6fb5; --review: #8a5cc2; --blocked: #c2453a; --done: #3d8a5a;
+    --radius: 6px; --gap: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-size: 14px; color: var(--ink); background: var(--bg);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #1b1a18; --panel: #252422; --ink: #ecebe8; --sub: #9c9890; --line: #3a3835;
+    --error-bg: #3a2220; --error-ink: #f0b4ad;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+  header h1 { flex: 1; }
+  header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size: 12px; }
+  .live { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+  .live.on { background: var(--done); }
+  main { padding: 16px 24px 48px; display: grid; gap: 24px; }
+  main > * { min-width: 0; }
+  h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 0 0 8px; }
+  .errors { background: var(--error-bg, #fbeae8); color: var(--error-ink, #8a2a22); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; font-size: 12px; }
+  .errors:empty { display: none; }
+
+  .milestones { display: flex; gap: var(--gap); flex-wrap: wrap; }
+  .ms { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; min-width: 200px; max-width: 320px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .ms[aria-pressed="true"] { outline: 2px solid var(--doing); outline-offset: -1px; }
+  .ms .head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+  .ms .goal { color: var(--sub); font-size: 12px; margin-top: 4px; }
+  .ms .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .ms .bar i { display: block; height: 100%; background: var(--done); }
+  .tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-weight: normal; white-space: nowrap; }
+  .tag.active { color: var(--doing); border-color: var(--doing); }
+  .tag.done { color: var(--done); border-color: var(--done); }
+
+  .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
+  .card .title { overflow-wrap: anywhere; }
+  .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .col h3 { font-size: 12px; margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
+  .col h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+  .col h3 .n { color: var(--sub); font-weight: normal; }
+  .cards { display: grid; gap: 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: var(--radius); padding: 8px 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+  .card .id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--sub); }
+  .card .title { margin: 2px 0 4px; }
+  .card .meta { display: flex; gap: 4px; flex-wrap: wrap; }
+  .card.cancelled { opacity: 0.55; }
+  .card.cancelled .title { text-decoration: line-through; }
+  .tag.high { color: var(--blocked); border-color: var(--blocked); }
+  .tag.wait { color: var(--review); border-color: var(--review); }
+
+  .decisions { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .decisions button { display: flex; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .decisions button:first-child { border-top: 0; }
+  .decisions .num { font-family: ui-monospace, monospace; color: var(--sub); }
+  .decisions .title { flex: 1; }
+  .decisions .date { color: var(--sub); font-size: 12px; }
+
+  .commits { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+
+  dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); width: min(720px, 92vw); max-height: 84vh; padding: 20px 24px; }
+  dialog::backdrop { background: rgb(0 0 0 / 0.3); }
+  dialog pre { white-space: pre-wrap; font-family: inherit; line-height: 1.6; margin: 0; }
+  dialog .notes { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px; }
+  dialog .note { margin: 8px 0; }
+  dialog .note time { color: var(--sub); font-size: 12px; display: block; }
+  dialog .close { float: right; }
+  .empty { color: var(--sub); font-size: 12px; }
+
+  button.primary, button.secondary { font: inherit; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; }
+  button.primary { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
+  button.secondary { background: none; color: var(--ink); border: 1px solid var(--line); }
+  .cards { min-height: 48px; border-radius: var(--radius); }
+  .col.drop .cards { outline: 2px dashed var(--c); outline-offset: 4px; }
+  .card[draggable="true"] { cursor: grab; }
+  .card.dragging { opacity: 0.4; }
+
+  #editor form { display: grid; gap: 12px; }
+  #editor .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  #editor label { display: grid; gap: 4px; font-size: 12px; color: var(--sub); min-width: 0; }
+  #editor input, #editor select, #editor textarea {
+    font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px;
+    width: 100%; min-width: 0;
+  }
+  #editor textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+  #editor .hint { font-size: 11px; color: var(--sub); }
+  #editor .actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+  #editor .actions .error { color: var(--blocked); flex: 1; white-space: pre-wrap; font-size: 12px; }
+  #editor .meta-line { font-size: 12px; color: var(--sub); }
+  .note .by { font-size: 11px; margin-left: 6px; }
+
+  .status-tabs { display: none; }
+
+  #settings { width: min(360px, 92vw); }
+  #settings fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 12px; margin: 0; display: grid; gap: 8px; }
+  #settings legend { font-size: 12px; color: var(--sub); padding: 0 4px; }
+  #settings label { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
+  .settings-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+  /* スマホ: 1 列ずつタブで切り替え、ダイアログは画面いっぱいにする */
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); position: sticky; top: 0; z-index: 2; background: var(--bg); }
+    header h1 { flex: 1; }
+    header .git { display: none; }
+    main { padding: 12px 16px 32px; padding-bottom: max(32px, env(safe-area-inset-bottom)); gap: 20px; }
+
+    .milestones { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+    .milestones::-webkit-scrollbar { display: none; }
+    .ms { flex: 0 0 78%; max-width: none; scroll-snap-align: start; }
+
+    .status-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
+    .status-tabs button { font: inherit; font-size: 11px; line-height: 1.3; color: var(--sub); background: var(--panel); border: 1px solid var(--line); border-bottom: 3px solid var(--line); border-radius: var(--radius); padding: 6px 2px 4px; min-height: 48px; display: grid; justify-items: center; align-content: center; gap: 2px; white-space: nowrap; }
+    .status-tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--line); border-bottom-color: var(--c); font-weight: 600; }
+    .status-tabs .n { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .col { display: none; }
+    .col.current { display: block; }
+    .col h3 { display: none; }
+    .card { padding: 10px 12px; }
+    .card .title { font-size: 15px; }
+
+    .decisions button { flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; }
+    .decisions .title { flex-basis: calc(100% - 60px); }
+    .decisions .tag { margin-left: 46px; }
+    .commits li { overflow-wrap: anywhere; }
+
+    dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 12px 12px 0 0; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    #settings { width: 100vw; }
+    #editor .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #editor .row label:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    /* iOS は 16px 未満の入力欄にフォーカスすると拡大するため */
+    #editor input, #editor select, #editor textarea { font-size: 16px; }
+    #editor .actions { position: sticky; bottom: -16px; background: var(--panel); padding: 8px 0; margin-bottom: -8px; }
+    #editor .actions button { min-height: 40px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="name">nagaya</h1>
+  <span class="git" id="git"></span>
+  <button type="button" class="primary" id="new-task">タスクを追加</button>
+  <button type="button" class="secondary" id="open-settings">設定</button>
+  <span class="live" id="live" title="変更を監視中"></span>
+</header>
+<main>
+  <div class="errors" id="errors"></div>
+  <section>
+    <h2>マイルストーン</h2>
+    <div class="milestones" id="milestones"></div>
+  </section>
+  <section>
+    <h2 id="board-title">タスク</h2>
+    <div class="status-tabs" id="status-tabs" role="tablist" aria-label="表示する状態"></div>
+    <div class="board" id="board"></div>
+  </section>
+  <section>
+    <h2>決定記録</h2>
+    <div class="decisions" id="decisions"></div>
+  </section>
+  <section>
+    <h2>最近のコミット</h2>
+    <ul class="commits" id="commits"></ul>
+  </section>
+</main>
+<dialog id="detail">
+  <form method="dialog" class="close"><button autofocus>閉じる</button></form>
+  <h3 id="detail-title"></h3>
+  <pre id="detail-body"></pre>
+  <div class="notes" id="detail-notes"></div>
+</dialog>
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings">
+    <h3 id="settings-title" style="margin: 0 0 12px">設定</h3>
+    <fieldset>
+      <legend>テーマ</legend>
+      <label><input type="radio" name="theme" value="light"> ライト</label>
+      <label><input type="radio" name="theme" value="dark"> ダーク</label>
+    </fieldset>
+    <div class="settings-actions"><button class="secondary">閉じる</button></div>
+  </form>
+</dialog>
+<dialog id="editor" aria-labelledby="editor-title">
+  <form id="editor-form">
+    <h3 id="editor-title" style="margin: 0"></h3>
+    <div class="meta-line" id="editor-meta"></div>
+    <label>タイトル<input name="title" required></label>
+    <div class="row">
+      <label>状態<select name="status"></select></label>
+      <label>優先度<select name="priority">
+        <option value="high">高</option><option value="normal">普通</option><option value="low">低</option>
+      </select></label>
+      <label>マイルストーン<select name="milestone"></select></label>
+    </div>
+    <div class="row">
+      <label>親タスク<select name="parent"></select></label>
+      <label>依存（先に終わるタスク）<input name="dependsOn" placeholder="T-005, T-006"></label>
+      <label>ラベル<input name="labels" placeholder="research, poc"></label>
+    </div>
+    <label>説明<textarea name="description" placeholder="目的や完了の条件"></textarea></label>
+    <label>メモを追記<textarea name="note" placeholder="経過や AI への補足。履歴に残る" style="min-height: 64px"></textarea></label>
+    <div class="actions">
+      <span class="error" id="editor-error" role="alert"></span>
+      <button type="button" class="secondary" id="editor-cancel">キャンセル</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+  <div class="notes" id="editor-notes"></div>
+</dialog>
+<script>
+const COLUMNS = [
+  ["todo", "未着手"], ["doing", "作業中"], ["review", "確認待ち"], ["blocked", "ブロック"], ["done", "完了・中止"],
+];
+const FINISHED = ["done", "cancelled"];
+const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
+const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+const THEME_KEY = "nagaya-devboard-theme";
+const THEME_COLOR = { light: "#f6f5f2", dark: "#1b1a18" };
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.getElementById("theme-color").content = THEME_COLOR[theme];
+}
+applyTheme(document.documentElement.dataset.theme);
+document.getElementById("open-settings").onclick = () => {
+  for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
+  document.getElementById("settings").showModal();
+};
+for (const r of document.querySelectorAll('#settings input[name="theme"]')) {
+  r.onchange = () => { localStorage.setItem(THEME_KEY, r.value); applyTheme(r.value); };
+}
+
+let data = null;
+let filter = null; // 選択中のマイルストーン ID
+let mobileStatus = "todo"; // スマホで表示している列
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const c of children) node.append(c);
+  return node;
+};
+const fmt = (iso) => new Date(iso).toLocaleString("ja-JP", { dateStyle: "short", timeStyle: "short" });
+
+function openDetail(title, body, notes = []) {
+  $("detail-title").textContent = title;
+  $("detail-body").textContent = body || "（説明なし）";
+  $("detail-notes").replaceChildren(
+    ...notes.slice().reverse().map((n) => el("div", { className: "note" }, el("time", { textContent: fmt(n.at) }), n.text)),
+  );
+  $("detail-notes").hidden = notes.length === 0;
+  $("detail").showModal();
+  $("detail").scrollTop = 0;
+}
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text;
+    try { message = JSON.parse(text).error ?? text; } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+const splitIds = (v) => v.split(/[\s,、]+/).map((x) => x.trim()).filter(Boolean);
+let editing = null; // 編集中のタスク。新規なら null
+
+function noteNode(n) {
+  return el("div", { className: "note" },
+    el("time", {}, fmt(n.at), el("span", { className: "by", textContent: n.by === "user" ? "あなた" : n.by === "ai" ? "AI" : "" })),
+    n.text);
+}
+
+function openEditor(task) {
+  editing = task;
+  const f = $("editor-form");
+  const opts = (select, items, value) => {
+    select.replaceChildren(...items.map(([v, label]) => el("option", { value: v, textContent: label })));
+    select.value = value;
+  };
+  opts(f.status, Object.entries(STATUS_LABEL), task?.status ?? "todo");
+  opts(f.milestone, [["", "なし"], ...data.project.milestones.map((m) => [m.id, `${m.id} ${m.title}`])], task?.milestone ?? filter ?? "");
+  const parents = data.tasks.filter((t) => t.id !== task?.id && !FINISHED.includes(t.status));
+  if (task?.parent && !parents.some((t) => t.id === task.parent)) parents.push(data.tasks.find((t) => t.id === task.parent));
+  opts(f.parent, [["", "なし"], ...parents.filter(Boolean).map((t) => [t.id, `${t.id} ${t.title}`])], task?.parent ?? "");
+  f.title.value = task?.title ?? "";
+  f.priority.value = task?.priority ?? "normal";
+  f.dependsOn.value = (task?.dependsOn ?? []).join(", ");
+  f.labels.value = (task?.labels ?? []).join(", ");
+  f.description.value = task?.description ?? "";
+  f.note.value = "";
+  $("editor-title").textContent = task ? task.id : "タスクを追加";
+  const children = task ? data.tasks.filter((t) => t.parent === task.id) : [];
+  $("editor-meta").textContent = task
+    ? [`${task.createdBy === "user" ? "あなた" : "AI"}が登録`, `更新 ${fmt(task.updated)}`, task.branch && `ブランチ ${task.branch}`,
+       children.length && `子タスク: ${children.map((c) => `${c.id}（${STATUS_LABEL[c.status]}）`).join(", ")}`].filter(Boolean).join(" · ")
+    : "";
+  $("editor-notes").replaceChildren(...(task?.notes ?? []).slice().reverse().map(noteNode));
+  $("editor-notes").hidden = !task?.notes.length;
+  $("editor-error").textContent = "";
+  $("editor").showModal();
+  $("editor").scrollTop = 0;
+  f.title.focus();
+}
+
+$("editor-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const body = {
+    title: f.title.value,
+    status: f.status.value,
+    priority: f.priority.value,
+    milestone: f.milestone.value || null,
+    parent: f.parent.value || null,
+    dependsOn: splitIds(f.dependsOn.value),
+    labels: splitIds(f.labels.value),
+    description: f.description.value,
+  };
+  // 開いている間に AI が同じタスクを更新していても上書きしないよう、変えた項目だけ送る
+  if (editing) {
+    for (const key of Object.keys(body)) {
+      if (JSON.stringify(body[key]) === JSON.stringify(editing[key] ?? null)) delete body[key];
+    }
+    if (f.note.value.trim()) body.note = f.note.value;
+    if (Object.keys(body).length === 0) return $("editor").close();
+  }
+  try {
+    if (editing) await api("PATCH", `/api/tasks/${editing.id}`, body);
+    else {
+      const created = await api("POST", "/api/tasks", body);
+      if (f.note.value.trim()) await api("PATCH", `/api/tasks/${created.id}`, { note: f.note.value });
+    }
+    $("editor").close();
+    await load();
+  } catch (err) {
+    $("editor-error").textContent = err.message;
+  }
+});
+$("editor-cancel").onclick = () => $("editor").close();
+$("new-task").onclick = () => openEditor(null);
+
+let dragged = null; // ドラッグ中のタスク ID
+
+async function moveTask(id, status) {
+  const task = data.tasks.find((t) => t.id === id);
+  if (!task || task.status === status || (status === "done" && task.status === "cancelled")) return;
+  try {
+    await api("PATCH", `/api/tasks/${id}`, { status });
+    await load();
+  } catch (err) {
+    alert(`${id} の状態を変えられなかった: ${err.message}`);
+  }
+}
+
+function render() {
+  const { project, tasks, decisions, git, errors } = data;
+  $("name").textContent = project.name;
+  $("git").textContent = git.branch ? `${git.branch}${git.dirty ? ` · 未コミット ${git.dirty}` : ""}` : "";
+  $("errors").textContent = errors.join("\n");
+
+  $("milestones").replaceChildren(...project.milestones.map((m) => {
+    const mine = tasks.filter((t) => t.milestone === m.id);
+    const done = mine.filter((t) => t.status === "done").length;
+    const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
+    const label = { planned: "予定", active: "進行中", done: "完了" }[m.status];
+    const node = el("button", { className: "ms", type: "button" },
+      el("div", { className: "head" }, `${m.id} ${m.title}`, el("span", { className: `tag ${m.status}`, textContent: label })),
+      el("div", { className: "goal", textContent: m.goal }),
+      el("div", { className: "bar", title: `${done}/${mine.length}` }, el("i", { style: `width:${pct}%` })),
+    );
+    node.setAttribute("aria-pressed", String(filter === m.id));
+    node.onclick = () => { filter = filter === m.id ? null : m.id; render(); };
+    return node;
+  }));
+
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const childCount = (id) => tasks.filter((t) => t.parent === id).length;
+  const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
+  $("board-title").textContent = filter ? `タスク（${filter} のみ）` : "タスク";
+  const inColumnOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
+  $("status-tabs").replaceChildren(...COLUMNS.map(([status, label]) => {
+    const tab = el("button", { type: "button", role: "tab", style: `--c: var(--${status})` },
+      label, el("span", { className: "n", textContent: shown.filter(inColumnOf(status)).length }));
+    tab.setAttribute("aria-selected", String(status === mobileStatus));
+    tab.onclick = () => { mobileStatus = status; render(); };
+    return tab;
+  }));
+  $("board").replaceChildren(...COLUMNS.map(([status, label]) => {
+    const inColumn = inColumnOf(status);
+    const items = shown.filter(inColumn).sort((a, b) =>
+      status === "todo"
+        ? PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.id.localeCompare(b.id)
+        : b.updated.localeCompare(a.updated));
+    const col = el("div", { className: `col${status === mobileStatus ? " current" : ""}`, style: `--c: var(--${status})` },
+      el("h3", {}, label, el("span", { className: "n", textContent: items.length })),
+      el("div", { className: "cards" }, ...(items.length ? items.map((t) => {
+        const waiting = t.dependsOn.filter((d) => !FINISHED.includes(byId.get(d)?.status));
+        const kids = childCount(t.id);
+        const card = el("div", { className: `card ${t.status}`, tabIndex: 0, draggable: true, role: "button", title: "クリックで編集、ドラッグで状態を変更" },
+          el("div", { className: "id", textContent: t.id }),
+          el("div", { className: "title", textContent: t.title }),
+          el("div", { className: "meta" },
+            ...(t.status === "cancelled" ? [el("span", { className: "tag", textContent: "中止" })] : []),
+            ...(t.priority === "high" ? [el("span", { className: "tag high", textContent: "優先" })] : []),
+            ...(t.parent ? [el("span", { className: "tag", textContent: `↳ ${t.parent}` })] : []),
+            ...(kids ? [el("span", { className: "tag", textContent: `子 ${kids}` })] : []),
+            ...(waiting.length ? [el("span", { className: "tag wait", textContent: `待ち ${waiting.join(", ")}` })] : []),
+            ...(t.milestone ? [el("span", { className: "tag", textContent: t.milestone })] : []),
+            ...t.labels.map((l) => el("span", { className: "tag", textContent: l })),
+            ...(t.branch ? [el("span", { className: "tag", textContent: t.branch })] : []),
+          ),
+        );
+        card.onclick = () => openEditor(t);
+        card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEditor(t); } };
+        card.ondragstart = (e) => { dragged = t.id; e.dataTransfer.setData("text/plain", t.id); card.classList.add("dragging"); };
+        card.ondragend = () => { dragged = null; card.classList.remove("dragging"); };
+        return card;
+      }) : [el("div", { className: "empty", textContent: "なし" })])),
+    );
+    col.addEventListener("dragover", (e) => { if (dragged) { e.preventDefault(); col.classList.add("drop"); } });
+    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
+    col.addEventListener("drop", (e) => { e.preventDefault(); col.classList.remove("drop"); if (dragged) moveTask(dragged, status); });
+    return col;
+  }));
+
+  $("decisions").replaceChildren(...(decisions.length ? decisions.slice().reverse().map((d) => {
+    const row = el("button", { type: "button" },
+      el("span", { className: "num", textContent: String(d.number).padStart(4, "0") }),
+      el("span", { className: "title", textContent: d.title }),
+      el("span", { className: "tag", textContent: d.status }),
+      el("span", { className: "date", textContent: d.date }),
+    );
+    row.onclick = () => openDetail(d.title, d.body);
+    return row;
+  }) : [el("div", { className: "empty", style: "padding: 8px 12px", textContent: "なし" })]));
+
+  $("commits").replaceChildren(...(git.commits.length
+    ? git.commits.map((c) => el("li", { textContent: `${c.hash} ${c.date} ${c.subject}` }))
+    : [el("li", { textContent: "コミットなし" })]));
+}
+
+async function load() {
+  const res = await fetch("/api/snapshot");
+  data = await res.json();
+  render();
+}
+
+function listen() {
+  const es = new EventSource("/api/events");
+  es.onopen = () => { $("live").classList.add("on"); load(); };
+  es.addEventListener("change", load);
+  es.onerror = () => $("live").classList.remove("on");
+}
+
+load();
+listen();
+</script>
+</body>
+</html>

@@ -1,0 +1,257 @@
+// nagaya 開発用の MCP サーバ（stdio）。.mcp.json から nagaya-dev として登録している。
+// タスク・マイルストーン・決定記録を読み書きする。データはダッシュボードと共有（store.ts）。
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import {
+  TaskStatus,
+  TaskCreateInput,
+  TaskUpdateInput,
+  nextTasks,
+  describeTasks,
+  MILESTONE_STATUSES,
+  DECISION_STATUSES,
+  snapshot,
+  readTasks,
+  getTask,
+  createTask,
+  updateTask,
+  readDecisions,
+  createDecision,
+  setDecisionStatus,
+  readProject,
+  writeProject,
+} from "./store.ts";
+import { ensureServer } from "./launcher.ts";
+
+const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッションを管理するデスクトップアプリ）の開発ボード。
+作業を始めるときは get_overview で現在のマイルストーン、進行中のタスク、次に着手できるタスク（next）、進められないタスク（stuck）を確認する。
+「未着手をすべて進めて」のような一括の依頼は、list_tasks(status: "todo") で全体を見て、ready のものを order の順に進め、1 件終わるたびに list_tasks を取り直す。ready が 0 件になったら終える。stuck のものは理由を添えてユーザーに返す。
+ユーザーの大まかな依頼は、依頼そのものを親タスクとして登録し（説明に依頼文をそのまま残す）、1 セッションで終わる大きさの子タスク（parent）に分ける。順番があるものは dependsOn でつなぐ。
+不要になったタスクは消さずに cancelled にし、理由を note に残す。
+ユーザーも画面からタスクを登録・編集する。createdBy: user のタスクや by: user のメモはユーザーの指示として扱う。
+作業に入るタスクは update_task で status を doing にし、区切りごとに note で経過を残す。終わったら review か done にする。
+設計上の判断をしたら create_decision で docs/decisions/ に記録する（後から覆すときは新しい記録を作り、古い方を「置き換え」にする）。
+ユーザーに見せたいときは open_dashboard で URL を返す（ブラウザで開くのはユーザー）。`;
+
+const server = new McpServer({ name: "nagaya-dev", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+
+const json = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
+
+const tool = <T,>(fn: () => T | Promise<T>) =>
+  Promise.resolve()
+    .then(fn)
+    .then(json)
+    .catch((e: unknown) => ({
+      isError: true,
+      content: [{ type: "text" as const, text: e instanceof Error ? e.message : String(e) }],
+    }));
+
+server.registerTool(
+  "get_overview",
+  {
+    description: "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す",
+    annotations: { readOnlyHint: true },
+  },
+  () =>
+    tool(() => {
+      const s = snapshot();
+      const count = Object.fromEntries(TaskStatus.options.map((st) => [st, s.tasks.filter((t) => t.status === st).length]));
+      const pick = (st: string) =>
+        s.tasks.filter((t) => t.status === st).map((t) => ({ id: t.id, title: t.title, milestone: t.milestone, branch: t.branch }));
+      return {
+        project: { name: s.project.name, summary: s.project.summary },
+        milestones: s.project.milestones.map((m) => ({
+          ...m,
+          tasks: s.tasks.filter((t) => t.milestone === m.id).length,
+          done: s.tasks.filter((t) => t.milestone === m.id && t.status === "done").length,
+        })),
+        count,
+        doing: pick("doing"),
+        blocked: pick("blocked"),
+        review: pick("review"),
+        next: nextTasks(s.tasks)
+          .slice(0, 5)
+          .map((t) => ({ id: t.id, title: t.title, priority: t.priority, parent: t.parent, milestone: t.milestone })),
+        stuck: describeTasks(s.tasks)
+          .filter((t) => t.stuck)
+          .map((t) => ({ id: t.id, title: t.title, reason: t.stuck })),
+        closable: describeTasks(s.tasks)
+          .filter((t) => t.closable)
+          .map((t) => ({ id: t.id, title: t.title })),
+        recentDecisions: s.decisions.slice(-5).map(({ number, title, status, date }) => ({ number, title, status, date })),
+        git: s.git,
+        errors: s.errors,
+      };
+    }),
+);
+
+server.registerTool(
+  "list_tasks",
+  {
+    description: `タスクの一覧。未着手（todo）は着手する順（order）に並び、それ以外は ID 順。
+各タスクに ready（今すぐ着手できる）、waitingOn（終わっていない依存先）、stuck（AI だけでは進められない理由）、children、closable（子がすべて終わった親）が付く。
+「未着手をすべて進める」ときは status: todo で全体を見て、ready のものから順に進める。説明も要るときは detail: true`,
+    inputSchema: {
+      status: z
+        .union([TaskStatus, z.array(TaskStatus)])
+        .optional()
+        .describe("この状態だけに絞る。複数なら配列（例: [\"todo\", \"doing\"]）"),
+      ready: z.boolean().optional().describe("true なら今すぐ着手できるものだけ"),
+      milestone: z.string().optional().describe("このマイルストーン ID だけに絞る"),
+      label: z.string().optional().describe("このラベルを持つものだけに絞る"),
+      parent: z.string().optional().describe("このタスクの子だけに絞る"),
+      detail: z.boolean().optional().describe("true なら説明と最新のメモも含める"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ status, ready, milestone, label, parent, detail }) =>
+    tool(() => {
+      const { tasks, errors } = readTasks();
+      const statuses = status === undefined ? null : Array.isArray(status) ? status : [status];
+      const items = describeTasks(tasks)
+        .filter(
+          (t) =>
+            (!statuses || statuses.includes(t.status)) &&
+            (ready === undefined || t.ready === ready) &&
+            (!milestone || t.milestone === milestone) &&
+            (!label || t.labels.includes(label)) &&
+            (!parent || t.parent === parent),
+        )
+        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id))
+        .map(({ notes, description, created, createdBy, ...t }) =>
+          detail ? { ...t, createdBy, description, lastNote: notes.at(-1) ?? null } : { ...t, createdBy },
+        );
+      const summary = {
+        total: items.length,
+        ready: items.filter((t) => t.ready).length,
+        stuck: items.filter((t) => t.stuck).length,
+        closable: items.filter((t) => t.closable).length,
+      };
+      return errors.length ? { summary, tasks: items, errors } : { summary, tasks: items };
+    }),
+);
+
+server.registerTool(
+  "get_task",
+  {
+    description: "タスク 1 件の全項目（説明・メモの履歴を含む）と、子タスクの一覧",
+    inputSchema: { id: z.string().describe("例: T-001") },
+    annotations: { readOnlyHint: true },
+  },
+  ({ id }) =>
+    tool(() => {
+      const task = getTask(id);
+      const children = readTasks()
+        .tasks.filter((t) => t.parent === id)
+        .map(({ id, title, status }) => ({ id, title, status }));
+      return { ...task, children };
+    }),
+);
+
+server.registerTool(
+  "create_task",
+  {
+    description: "タスクを追加する。ID は自動採番（T-001 形式）。大きな依頼は親タスクを作ってから、parent を指定した子タスクに分ける",
+    inputSchema: TaskCreateInput.shape,
+  },
+  (input) => tool(() => createTask(input)),
+);
+
+server.registerTool(
+  "update_task",
+  {
+    description:
+      "タスクを更新する。指定した項目だけ変わる。note を渡すとメモの履歴に追記される。ユーザーが画面から書いたメモには by: user が付く",
+    inputSchema: { id: z.string(), ...TaskUpdateInput.shape },
+  },
+  ({ id, ...patch }) => tool(() => updateTask(id, { ...patch, by: "ai" })),
+);
+
+server.registerTool(
+  "set_milestone",
+  {
+    description: "マイルストーンを追加、または既存のものを更新する（ID が一致すれば更新）",
+    inputSchema: {
+      id: z.string().describe("例: M1"),
+      title: z.string().optional(),
+      goal: z.string().optional().describe("完了の条件"),
+      status: z.enum(MILESTONE_STATUSES).optional(),
+    },
+  },
+  ({ id, title, goal, status }) =>
+    tool(() => {
+      const project = readProject();
+      const i = project.milestones.findIndex((m) => m.id === id);
+      if (i < 0) {
+        if (!title) throw new Error("新しいマイルストーンには title が必要");
+        project.milestones.push({ id, title, goal: goal ?? "", status: status ?? "planned" });
+      } else {
+        const m = project.milestones[i]!;
+        project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
+      }
+      writeProject(project);
+      return project.milestones;
+    }),
+);
+
+server.registerTool(
+  "list_decisions",
+  {
+    description: "決定記録（docs/decisions/）の一覧",
+    annotations: { readOnlyHint: true },
+  },
+  () => tool(() => readDecisions().map(({ number, title, status, date, file }) => ({ number, title, status, date, file }))),
+);
+
+server.registerTool(
+  "get_decision",
+  {
+    description: "決定記録 1 件の本文",
+    inputSchema: { number: z.number().int().positive() },
+    annotations: { readOnlyHint: true },
+  },
+  ({ number }) =>
+    tool(() => {
+      const d = readDecisions().find((x) => x.number === number);
+      if (!d) throw new Error(`決定記録 ${number} は存在しない`);
+      return d;
+    }),
+);
+
+server.registerTool(
+  "create_decision",
+  {
+    description: "決定記録を docs/decisions/NNNN-slug.md として追加する。番号は自動採番",
+    inputSchema: {
+      title: z.string().min(1),
+      slug: z.string().describe("ファイル名に使う英小文字とハイフン（例: app-architecture）"),
+      status: z.enum(DECISION_STATUSES).optional().describe("既定は 提案"),
+      context: z.string().describe("背景: なぜ決める必要があったか、検討した選択肢"),
+      decision: z.string().describe("決定: 何を選んだか"),
+      consequences: z.string().describe("影響: 良くなること、諦めたこと、後で見直す条件"),
+    },
+  },
+  (input) => tool(() => createDecision(input)),
+);
+
+server.registerTool(
+  "set_decision_status",
+  {
+    description: "決定記録の状態を変える（提案 → 採用 など）",
+    inputSchema: { number: z.number().int().positive(), status: z.enum(DECISION_STATUSES) },
+  },
+  ({ number, status }) => tool(() => setDecisionStatus(number, status)),
+);
+
+server.registerTool(
+  "open_dashboard",
+  {
+    description: "ダッシュボードが動いていなければ起動し、URL を返す",
+    annotations: { readOnlyHint: true },
+  },
+  () => tool(() => ensureServer()),
+);
+
+await server.connect(new StdioServerTransport());
