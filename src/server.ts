@@ -1,5 +1,6 @@
 // 開発ダッシュボードの HTTP サーバ。127.0.0.1 のみで待ち受ける。
 //   GET /               画面（public/index.html）
+//   GET /markdown.js    画面が使う Markdown の解析器（public/markdown.js）
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/events     変更通知（Server-Sent Events）。dev/ と docs/decisions/ と .git の変更で送る
 //   POST  /api/tasks       タスクの追加（画面から。createdBy: user）
@@ -22,7 +23,7 @@ export function instanceFile(): string {
   return join(repoRoot(), ".dev", "devboard.json");
 }
 
-const html = () => readFileSync(join(import.meta.dirname, "..", "public", "index.html"));
+const asset = (name: string) => readFileSync(join(import.meta.dirname, "..", "public", name));
 
 const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
@@ -131,7 +132,9 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
     if (req.method !== "GET") return send(res, 405, "text/plain", "method not allowed");
     switch (url.pathname) {
       case "/":
-        return send(res, 200, "text/html; charset=utf-8", html());
+        return send(res, 200, "text/html; charset=utf-8", asset("index.html"));
+      case "/markdown.js":
+        return send(res, 200, "text/javascript; charset=utf-8", asset("markdown.js"));
       case "/api/hosts":
         return send(res, 200, "application/json; charset=utf-8", JSON.stringify([...LOOPBACK, ...remote]));
       case "/api/snapshot":
