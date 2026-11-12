@@ -31,7 +31,8 @@ const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッション
 ユーザーの大まかな依頼は、依頼そのものを親タスクとして登録し（説明に依頼文をそのまま残す）、1 セッションで終わる大きさの子タスク（parent）に分ける。順番があるものは dependsOn でつなぐ。
 不要になったタスクは消さずに cancelled にし、理由を note に残す。
 ユーザーも画面からタスクを登録・編集する。createdBy: user のタスクや by: user のメモはユーザーの指示として扱う。
-作業に入るタスクは update_task で status を doing にし、区切りごとに note で経過を残す。終わったら review か done にする。
+作業に入るタスクは update_task で status を doing にし、区切りごとに note で経過を残す。結果は自分で確かめて done にする（ユーザーの確認待ちの review は使わない）。
+方針の判断も AI が行い、理由を create_decision か note に残す。AI に物理的にできないこと（ログイン、支払い、外部への公開など）だけ blocked にして、ユーザーにしてほしいことを note に書く。
 設計上の判断をしたら create_decision で docs/decisions/ に記録する（後から覆すときは新しい記録を作り、古い方を「置き換え」にする）。
 ユーザーに見せたいときは open_dashboard で URL を返す（ブラウザで開くのはユーザー）。`;
 
