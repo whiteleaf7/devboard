@@ -25,9 +25,11 @@ const FINISHED: readonly TaskStatus[] = ["done", "cancelled"];
 export const Author = z.enum(["user", "ai"]);
 export type Author = z.infer<typeof Author>;
 
-const Note = z.object({ at: z.string(), text: z.string(), by: Author.optional() });
+// ボードは複数の版のコード（worktree ごとの MCP）が読み書きする。知らない項目を落とすと、新しい版が書いたものを古い版が消してしまうので、
+// 読んでから書き戻すものは looseObject にして残す（T-039）
+const Note = z.looseObject({ at: z.string(), text: z.string(), by: Author.optional() });
 
-export const Task = z.object({
+export const Task = z.looseObject({
   id: z.string().regex(/^T-\d{3,}$/),
   title: z.string().min(1),
   status: TaskStatus,
@@ -47,7 +49,7 @@ export const Task = z.object({
 });
 export type Task = z.infer<typeof Task>;
 
-export const Milestone = z.object({
+export const Milestone = z.looseObject({
   id: z.string(),
   title: z.string(),
   goal: z.string().default(""),
@@ -55,7 +57,7 @@ export const Milestone = z.object({
 });
 export type Milestone = z.infer<typeof Milestone>;
 
-export const Project = z.object({
+export const Project = z.looseObject({
   name: z.string(),
   summary: z.string().default(""),
   milestones: z.array(Milestone).default([]),

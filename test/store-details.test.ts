@@ -120,3 +120,19 @@ test("スナップショットは、壊れたファイルがあっても残り�
   assert.deepEqual([broken.project.name, broken.project.milestones.length, broken.errors.length], ["nagaya", 0, 1]);
   assert.match(broken.errors[0] ?? "", /^dev\/project\.json: /);
 });
+
+test("知らない項目は、更新しても消さない（新しい版のコードが書いたものを、古い版が書き戻すとき）", () => {
+  const project = join(root, "dev", "project.json");
+  writeFileSync(project, JSON.stringify({ name: "t", owner: "me", milestones: [{ id: "M0", title: "m", status: "active", color: "red" }] }));
+  const task = store.createTask({ title: "新しい項目つき", milestone: "M0" });
+  const file = join(root, "dev", "tasks", `${task.id}.json`);
+  const future = { ...JSON.parse(readFileSync(file, "utf8")), future: ["x"], notes: [{ at: "2026-01-01T00:00:00.000Z", text: "a", mood: "ok" }] };
+  writeFileSync(file, JSON.stringify(future));
+  store.updateTask(task.id, { status: "doing", note: "b" });
+  const after = JSON.parse(readFileSync(file, "utf8"));
+  assert.deepEqual([after.future, after.notes[0].mood, after.status], [["x"], "ok", "doing"]);
+
+  store.updateProject((p) => p);
+  const saved = JSON.parse(readFileSync(project, "utf8"));
+  assert.deepEqual([saved.owner, saved.milestones[0].color], ["me", "red"]);
+});
