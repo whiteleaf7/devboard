@@ -6,6 +6,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// git のフックから動くと GIT_DIR などが渡ってくる。残すと、一時ディレクトリの git が本物のリポジトリを指す
+for (const name of Object.keys(process.env)) if (name.startsWith("GIT_")) delete process.env[name];
+
 const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-details-"));
 process.env.NAGAYA_ROOT = root;
 const store = await import("../src/store.ts");
