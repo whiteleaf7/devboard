@@ -2,7 +2,7 @@
 //   GET /               画面（public/index.html）
 //   GET /markdown.js    画面が使う Markdown の解析器（public/markdown.js）
 //   GET /api/snapshot   ボードの全データ
-//   GET /api/events     変更通知（Server-Sent Events）。dev/ と docs/decisions/ と .git の変更で送る
+//   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
 //   POST  /api/tasks       タスクの追加（画面から。createdBy: user）
 //   PATCH /api/tasks/:id   タスクの更新（画面から。メモは by: user）
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
@@ -14,10 +14,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { board, latestSeq } from "./board-db.ts";
 import { tailnetName } from "./tailnet.ts";
 import { paths, repoRoot, snapshot, createTask, updateTask, TaskCreateInput, TaskUpdateInput } from "./store.ts";
 
 export const DEFAULT_PORT = 4848;
+const BOARD_POLL_MS = 500;
 
 export function instanceFile(): string {
   return join(repoRoot(), ".dev", "devboard.json");
@@ -113,8 +115,19 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
     }, 200);
   };
 
+  // ボードは SQLite なので、イベントの番号が増えたかを見る
+  const db = board();
+  let seen = latestSeq(db);
+  const poll = setInterval(() => {
+    const seq = latestSeq(db);
+    if (seq !== seen) {
+      seen = seq;
+      notify();
+    }
+  }, BOARD_POLL_MS);
+
   const watchers: FSWatcher[] = [];
-  for (const dir of [paths.dev(), paths.decisions(), join(repoRoot(), ".git")]) {
+  for (const dir of [paths.decisions(), join(repoRoot(), ".git")]) {
     try {
       watchers.push(watch(dir, { recursive: true }, (_event, file) => {
         if (String(file ?? "").endsWith(".tmp")) return;
@@ -163,6 +176,7 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
   });
 
   const close = () => {
+    clearInterval(poll);
     for (const w of watchers) w.close();
     for (const res of clients) res.end();
     rmSync(instanceFile(), { force: true });

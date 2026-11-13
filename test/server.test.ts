@@ -1,15 +1,12 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { request } from "node:http";
+import { useTempBoard } from "./temp-board.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-server-"));
-process.env.NAGAYA_ROOT = root;
-mkdirSync(join(root, "dev", "tasks"), { recursive: true });
-writeFileSync(join(root, "dev", "project.json"), JSON.stringify({ name: "t", milestones: [{ id: "M0", title: "m", status: "active" }] }));
+useTempBoard("devboard-server");
+const store = await import("../src/store.ts");
+store.updateProject(() => ({ name: "t", summary: "", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
 
 const { startServer } = await import("../src/server.ts");
 const TS = "mac.example.ts.net";

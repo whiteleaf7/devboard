@@ -1,25 +1,21 @@
 // MCP サーバを子プロセスで起動し、ツールの振る舞いを外から確かめる。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { useTempBoard } from "./temp-board.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-mcp-"));
-mkdirSync(join(root, "dev", "tasks"), { recursive: true });
-writeFileSync(
-  join(root, "dev", "project.json"),
-  JSON.stringify({ name: "t", summary: "s", milestones: [{ id: "M0", title: "m", status: "active" }] }),
-);
+useTempBoard("devboard-mcp");
+const store = await import("../src/store.ts");
+store.updateProject(() => ({ name: "t", summary: "s", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
 
 const client = new Client({ name: "devboard-test", version: "0.0.0" });
 
 before(async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined));
   await client.connect(
-    new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, "../src/mcp.ts")], env: { ...env, NAGAYA_ROOT: root } }),
+    new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, "../src/mcp.ts")], env }),
   );
 });
 after(() => client.close());
@@ -55,7 +51,10 @@ test("タスクを足して、一覧と概要で進め方の情報を返す", as
   const first = await ok<{ id: string }>("create_task", { title: "先にやる", parent: parent.id, labels: ["ui"], description: "説明" });
   const second = await ok<{ id: string }>("create_task", { title: "後でやる", parent: parent.id, dependsOn: [first.id] });
   const urgent = await ok<{ id: string }>("create_task", { title: "急ぎ", priority: "high", milestone: "M0" });
-  const waiting = await ok<{ id: string }>("create_task", { title: "ユーザー待ち", status: "blocked" });
+  const refused = await call("create_task", { title: "メモの無い blocked", status: "blocked" });
+  assert.ok(refused.isError && /メモ/.test(refused.text), "メモの無い blocked は作らせない");
+  const waiting = await ok<{ id: string }>("create_task", { title: "ユーザー待ち" });
+  await ok("update_task", { id: waiting.id, status: "blocked", note: "ユーザーの判断を待つ" });
   const behind = await ok<{ id: string }>("create_task", { title: "待ちの後ろ", dependsOn: [waiting.id] });
 
   const todo = await ok<TaskList>("list_tasks", { status: "todo" });
@@ -95,7 +94,7 @@ test("タスクを足して、一覧と概要で進め方の情報を返す", as
   assert.deepEqual(overview.next.map((t) => t.id), [urgent.id], "依存先が進行中のうちは、次には出さない");
   assert.deepEqual(overview.stuck.map((t) => t.id), [behind.id]);
   assert.match(overview.stuck[0]?.reason ?? "", /ブロック/);
-  assert.deepEqual(overview.problems.map((p) => [p.check, p.file]), [["unexplained-state", `dev/tasks/${waiting.id}.json`]], "メモの無い blocked を知らせる");
+  assert.deepEqual(overview.problems, [], "書く時点で弾くので、問題は残らない");
   assert.deepEqual(overview.errors, []);
 
   await ok("update_task", { id: first.id, status: "done", note: "確かめた" });
@@ -104,6 +103,12 @@ test("タスクを足して、一覧と概要で進め方の情報を返す", as
   const milestone = (await ok<{ milestones: { id: string; done: number }[] }>("get_overview")).milestones[0];
   assert.equal(milestone?.done, 0, "子が終わっても、親を閉じるまでマイルストーンの完了数は増えない");
 
+  const history = (await ok<{ history: { kind: string; by: string; changes?: Record<string, { from: unknown; to: unknown }> }[] }>("get_task", { id: first.id })).history;
+  assert.deepEqual(
+    history.map((e) => [e.kind, e.by, e.changes?.status?.to ?? null]),
+    [["task.created", "ai", null], ["task.changed", "ai", "doing"], ["task.changed", "ai", "done"]],
+    "誰がいつ状態を変えたかを返す（メモはタスクの notes にある）",
+  );
   const got = await ok<{ id: string; children: { id: string; status: string }[] }>("get_task", { id: parent.id });
   assert.deepEqual(got.children, [
     { id: first.id, title: "先にやる", status: "done" },

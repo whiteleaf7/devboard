@@ -1,35 +1,38 @@
-// store.ts の、細かい振る舞い（採番、日付、git の読み取り、決定記録の読み取り）を確かめる。
+// store.ts の、細かい振る舞い（採番、日付、履歴、書く時点の決まり、git の読み取り、決定記録の読み取り）を確かめる。
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { useTempBoard } from "./temp-board.ts";
 
 // git のフックから動くと GIT_DIR などが渡ってくる。残すと、一時ディレクトリの git が本物のリポジトリを指す
 for (const name of Object.keys(process.env)) if (name.startsWith("GIT_")) delete process.env[name];
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-details-"));
-process.env.NAGAYA_ROOT = root;
+const root = useTempBoard("devboard-details");
 const store = await import("../src/store.ts");
+const { board } = await import("../src/board-db.ts");
+
+const rawRow = (table: "tasks" | "project", id: string | number) => JSON.parse(String(board().prepare(`SELECT data FROM ${table} WHERE id = ?`).get(id)?.data));
+const insertTask = (id: string, number: number) =>
+  board().prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?)").run(id, number, JSON.stringify({ id, title: "手で足した", status: "todo", created: "", updated: "" }));
 
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "ignore" });
 
 before(() => {
-  mkdirSync(join(root, "dev", "tasks"), { recursive: true });
   mkdirSync(join(root, "docs", "decisions"), { recursive: true });
-  writeFileSync(join(root, "dev", "project.json"), JSON.stringify({ name: "t", milestones: [{ id: "M0", title: "m", status: "active" }] }));
+  store.updateProject(() => ({ name: "t", summary: "", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
 });
 
 test("タスクの番号は、いちばん大きい番号の次を 3 桁でそろえる", () => {
   assert.equal(store.createTask({ title: "a" }).id, "T-001");
-  writeFileSync(join(root, "dev", "tasks", "T-041.json"), JSON.stringify({ id: "T-041", title: "手で足した", status: "todo", created: "", updated: "" }));
+  insertTask("T-041", 41);
   assert.equal(store.createTask({ title: "b" }).id, "T-042", "件数ではなく、いちばん大きい番号の次");
-  writeFileSync(join(root, "dev", "tasks", "T-1234.json"), JSON.stringify({ id: "T-1234", title: "4 桁", status: "todo", created: "", updated: "" }));
+  insertTask("T-1234", 1234);
   assert.equal(store.createTask({ title: "c" }).id, "T-1235");
 });
 
-test("作成したタスクは既定値を持ち、ファイルに書かれる", () => {
+test("作成したタスクは既定値を持ち、ボードと作成のイベントに残る", () => {
   const task = store.createTask({ title: "既定値", description: "説明", labels: ["x"], branch: "feat/x" });
   assert.deepEqual(
     { ...task, id: "", created: "", updated: "" },
@@ -37,10 +40,8 @@ test("作成したタスクは既定値を持ち、ファイルに書かれる",
   );
   assert.equal(task.created, task.updated);
   assert.ok(!Number.isNaN(Date.parse(task.created)));
-  const onDisk = readFileSync(join(root, "dev", "tasks", `${task.id}.json`), "utf8");
-  assert.deepEqual(JSON.parse(onDisk), task);
-  assert.ok(onDisk.endsWith("}\n") && onDisk.includes('\n  "title"'), "2 文字の字下げと、末尾の改行");
-  assert.deepEqual(readdirSync(join(root, "dev", "tasks")).filter((f) => f.endsWith(".tmp")), [], "一時ファイルを残さない");
+  assert.deepEqual(rawRow("tasks", task.id), task);
+  assert.deepEqual(store.taskHistory(task.id).map((e) => [e.kind, e.actor, e.at]), [["task.created", "ai", task.created]]);
   assert.equal(store.createTask({ title: "ユーザーから", createdBy: "user" }).createdBy, "user");
 });
 
@@ -63,6 +64,35 @@ test("更新は渡した項目だけを変え、メモは前後の空白を落�
   assert.throws(() => store.updateTask(task.id, { parent: task.id }), /循環/);
   assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"] }), /T-999/);
   assert.throws(() => store.getTask("T-999"), /T-999/);
+
+  const history = store.taskHistory(task.id).map((e) => [e.kind, e.actor, e.data]);
+  assert.deepEqual(history[1], ["task.changed", "user", { changes: { status: { from: "todo", to: "doing" } } }], "誰が何をどう変えたか");
+  assert.deepEqual(history[2]?.slice(0, 2), ["task.noted", "user"]);
+  assert.deepEqual(history[3], ["task.changed", "ai", { changes: { labels: { from: ["a"], to: [] } } }], "空白だけのメモはイベントにしない");
+  assert.throws(() => board().prepare("UPDATE events SET actor = 'user'").run(), /追記/, "イベントは書き換えられない");
+  assert.throws(() => board().prepare("DELETE FROM events").run(), /追記/, "イベントは消せない");
+});
+
+test("AI の書き込みは、ボードの決まりに新しく反するなら断る。ユーザーの書き込みは断らない", () => {
+  const parent = store.createTask({ title: "親" });
+  const child = store.createTask({ title: "子", parent: parent.id });
+  assert.throws(() => store.updateTask(child.id, { status: "done" }), /メモ/, "メモの無い done");
+  assert.throws(() => store.updateTask(child.id, { status: "blocked" }), /メモ/, "メモの無い blocked");
+  assert.throws(() => store.updateTask(child.id, { status: "review", note: "見て" }), /review/, "AI のタスクの review");
+  assert.throws(() => store.updateTask(parent.id, { status: "done", note: "終えた" }), /子/, "子が残っている親の done");
+  assert.equal(store.getTask(parent.id).status, "todo", "断ったら何も書かない");
+  assert.equal(store.taskHistory(parent.id).length, 1);
+
+  assert.equal(store.updateTask(child.id, { status: "done", note: "確かめた" }).status, "done", "同じ呼び出しでメモを足せばよい");
+  assert.equal(store.updateTask(parent.id, { status: "done", note: "子が終わった" }).status, "done");
+  assert.equal(store.updateTask(store.createTask({ title: "画面から" }).id, { status: "done", by: "user" }).status, "done", "ユーザーは断らない");
+
+  // ユーザーが壊した状態は、AI がほかの項目を変えても断らない（新しく増えた問題だけを止める）
+  const reopened = store.updateTask(child.id, { status: "todo", by: "user" });
+  assert.equal(store.updateTask(parent.id, { priority: "high" }).priority, "high");
+  assert.equal(reopened.status, "todo");
+  store.createTask({ title: "M0 のもの", milestone: "M0" });
+  assert.throws(() => store.updateProject((p) => ({ ...p, milestones: [] })), /マイルストーン.*M0/, "使われているマイルストーンは消せない");
 });
 
 test("決定記録は今日の日付で作り、ファイル名の番号順に読む", () => {
@@ -94,7 +124,7 @@ test("git の状態（ブランチ、未コミットの件数、最近のコミ�
   git("config", "user.name", "t");
   git("config", "user.email", "t@example.com");
   git("config", "commit.gpgsign", "false");
-  writeFileSync(join(root, ".gitignore"), "dev/\ndocs/\n");
+  writeFileSync(join(root, ".gitignore"), "docs/\nboard.sqlite*\n");
   for (const subject of ["chore: first", "feat: second", "fix: third"]) {
     writeFileSync(join(root, "a.txt"), subject);
     git("add", "a.txt", ".gitignore");
@@ -110,29 +140,29 @@ test("git の状態（ブランチ、未コミットの件数、最近のコミ�
   assert.equal(store.readGit().commits.length, 3);
 });
 
-test("スナップショットは、壊れたファイルがあっても残りを返す", () => {
+test("スナップショットは、壊れた行があっても残りを返す", () => {
   const snapshot = store.snapshot();
   assert.deepEqual([snapshot.project.name, snapshot.errors.length, snapshot.git.branch], ["t", 0, "main"]);
   assert.ok(snapshot.tasks.length >= 5 && snapshot.decisions.length === 4);
   assert.ok(!Number.isNaN(Date.parse(snapshot.generatedAt)));
-  writeFileSync(join(root, "dev", "project.json"), "{");
+  board().prepare("UPDATE project SET data = '{' WHERE id = 1").run();
   const broken = store.snapshot();
-  assert.deepEqual([broken.project.name, broken.project.milestones.length, broken.errors.length], ["nagaya", 0, 1]);
-  assert.match(broken.errors[0] ?? "", /^dev\/project\.json: /);
+  assert.deepEqual([broken.project.milestones.length, broken.errors.length], [0, 1]);
+  assert.match(broken.errors[0] ?? "", /^project: /);
 });
 
 test("知らない項目は、更新しても消さない（新しい版のコードが書いたものを、古い版が書き戻すとき）", () => {
-  const project = join(root, "dev", "project.json");
-  writeFileSync(project, JSON.stringify({ name: "t", owner: "me", milestones: [{ id: "M0", title: "m", status: "active", color: "red" }] }));
+  board()
+    .prepare("UPDATE project SET data = ? WHERE id = 1")
+    .run(JSON.stringify({ name: "t", owner: "me", milestones: [{ id: "M0", title: "m", status: "active", color: "red" }] }));
   const task = store.createTask({ title: "新しい項目つき", milestone: "M0" });
-  const file = join(root, "dev", "tasks", `${task.id}.json`);
-  const future = { ...JSON.parse(readFileSync(file, "utf8")), future: ["x"], notes: [{ at: "2026-01-01T00:00:00.000Z", text: "a", mood: "ok" }] };
-  writeFileSync(file, JSON.stringify(future));
+  const future = { ...rawRow("tasks", task.id), future: ["x"], notes: [{ at: "2026-01-01T00:00:00.000Z", text: "a", mood: "ok" }] };
+  board().prepare("UPDATE tasks SET data = ? WHERE id = ?").run(JSON.stringify(future), task.id);
   store.updateTask(task.id, { status: "doing", note: "b" });
-  const after = JSON.parse(readFileSync(file, "utf8"));
+  const after = rawRow("tasks", task.id);
   assert.deepEqual([after.future, after.notes[0].mood, after.status], [["x"], "ok", "doing"]);
 
   store.updateProject((p) => p);
-  const saved = JSON.parse(readFileSync(project, "utf8"));
+  const saved = rawRow("project", 1);
   assert.deepEqual([saved.owner, saved.milestones[0].color], ["me", "red"]);
 });

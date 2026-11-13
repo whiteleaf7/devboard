@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, realpathSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -27,11 +28,9 @@ test("linked worktree の中からでも、main の worktree をボードの根�
   assert.equal(mainWorktreeOf(plain), plain, "git の管理下でなければ、そのまま");
 });
 
-test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えない", async () => {
+test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えず、イベントがそろう", async () => {
   const root = mkdtempSync(join(tmpdir(), "nagaya-parallel-"));
-  mkdirSync(join(root, "dev", "tasks"), { recursive: true });
-  writeFileSync(join(root, "dev", "project.json"), JSON.stringify({ name: "t", milestones: [] }));
-
+  const boardFile = join(root, "board.sqlite");
   const script = `
     const s = await import(${JSON.stringify(store)});
     for (let i = 0; i < 10; i++) s.createTask({ title: "t" + i });
@@ -39,11 +38,15 @@ test("複数のプロセスが同時に作っても、番号が重ならず、�
     for (let i = 0; i < 3; i++) s.createDecision({ title: "d", slug: "d-" + process.pid + "-" + i, context: "c", decision: "d", consequences: "e" });
   `;
   const run = promisify(execFile);
-  await Promise.all(Array.from({ length: 4 }, () => run(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, NAGAYA_ROOT: root } })));
+  await Promise.all(
+    Array.from({ length: 4 }, () => run(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, NAGAYA_ROOT: root, NAGAYA_BOARD: boardFile } })),
+  );
 
-  const tasks = readdirSync(join(root, "dev", "tasks")).filter((f) => f.endsWith(".json"));
-  assert.equal(tasks.length, 40);
-  assert.equal(readdirSync(join(root, "dev", "lessons")).length, 12);
+  const db = new DatabaseSync(boardFile);
+  const count = (sql: string) => Number(db.prepare(sql).get()?.n);
+  assert.equal(count("SELECT count(DISTINCT number) AS n FROM tasks"), 40);
+  assert.equal(count("SELECT count(DISTINCT number) AS n FROM lessons"), 12);
+  assert.equal(count("SELECT count(*) AS n FROM events WHERE kind = 'task.created'"), 40);
   const numbers = readdirSync(join(root, "docs", "decisions")).map((f) => f.slice(0, 4));
   assert.equal(new Set(numbers).size, 12, "決定記録の番号が重ならない");
   assert.deepEqual(readdirSync(join(root, ".dev")), [], "ロックが残らない");

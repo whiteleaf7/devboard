@@ -15,6 +15,7 @@ import {
   snapshot,
   readTasks,
   getTask,
+  taskHistory,
   createTask,
   updateTask,
   readDecisions,
@@ -142,7 +143,7 @@ server.registerTool(
 server.registerTool(
   "get_task",
   {
-    description: "タスク 1 件の全項目（説明・メモの履歴を含む）と、子タスクの一覧",
+    description: "タスク 1 件の全項目（説明・メモを含む）と、子タスクの一覧、変更の履歴（history: いつ・誰が（user / ai）・何を変えたか）。ユーザーが変えた状態や優先度を戻す前に history を見る",
     inputSchema: { id: z.string().describe("例: T-001") },
     annotations: { readOnlyHint: true },
   },
@@ -152,7 +153,8 @@ server.registerTool(
       const children = readTasks()
         .tasks.filter((t) => t.parent === id)
         .map(({ id, title, status }) => ({ id, title, status }));
-      return { ...task, children };
+      const history = taskHistory(id).map(({ at, actor, kind, data }) => ({ at, by: actor, kind, ...(typeof data === "object" && data !== null ? data : {}) }));
+      return { ...task, children, history: history.filter((e) => e.kind !== "task.noted") };
     }),
 );
 
@@ -279,7 +281,7 @@ server.registerTool(
   "add_lesson",
   {
     description:
-      "教訓を dev/lessons/L-NNN.json に残す。うまくいかなかったこと、遠回りしたこと、環境の罠と、その対処を書く。次のセッションが recall で引き出す",
+      "教訓をボードに残す。うまくいかなかったこと、遠回りしたこと、環境の罠と、その対処を書く。次のセッションが recall で引き出す",
     inputSchema: LessonInput.shape,
   },
   (input) => tool(() => createLesson(input)),

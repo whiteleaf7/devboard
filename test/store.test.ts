@@ -1,19 +1,15 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { useTempBoard } from "./temp-board.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-"));
-process.env.NAGAYA_ROOT = root;
+const root = useTempBoard("devboard");
 const store = await import("../src/store.ts");
+const { board } = await import("../src/board-db.ts");
 
 before(() => {
-  mkdirSync(join(root, "dev", "tasks"), { recursive: true });
-  writeFileSync(
-    join(root, "dev", "project.json"),
-    JSON.stringify({ name: "t", milestones: [{ id: "M0", title: "m", status: "active" }] }),
-  );
+  store.updateProject(() => ({ name: "t", summary: "", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
 });
 
 test("タスクを採番して作成し、更新でメモが積まれる", () => {
@@ -32,8 +28,8 @@ test("存在しないマイルストーンは拒否する", () => {
   assert.throws(() => store.createTask({ title: "x", milestone: "M9" }), /M9/);
 });
 
-test("壊れたタスクファイルはエラーとして返し、他は読める", () => {
-  writeFileSync(join(root, "dev", "tasks", "T-900.json"), "{");
+test("壊れた行はエラーとして返し、他は読める", () => {
+  board().prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?)").run("T-900", 900, "{");
   const { tasks, errors } = store.readTasks();
   assert.ok(tasks.length >= 2);
   assert.equal(errors.length, 1);

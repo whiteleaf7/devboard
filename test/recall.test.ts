@@ -1,17 +1,13 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { buildDocs, recall, tokenize, type RecallDoc } from "../src/recall.ts";
+import { useTempBoard } from "./temp-board.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-recall-"));
-process.env.NAGAYA_ROOT = root;
+useTempBoard("recall");
 const store = await import("../src/store.ts");
 
 before(() => {
-  mkdirSync(join(root, "dev", "tasks"), { recursive: true });
-  writeFileSync(join(root, "dev", "project.json"), JSON.stringify({ name: "t", milestones: [] }));
+  store.updateProject(() => ({ name: "t", summary: "", milestones: [] }));
 });
 
 const docs: RecallDoc[] = [

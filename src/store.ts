@@ -1,94 +1,32 @@
-// 開発ボードのデータ（dev/ と docs/decisions/）を読み書きする。
-// ダッシュボード（server.ts）と MCP サーバ（mcp.ts）の両方がこれを使う。
+// 開発ボードのデータを読み書きする。ダッシュボード（server.ts）と MCP サーバ（mcp.ts）の両方がこれを使う。
+// タスク・教訓・マイルストーンは git の外の SQLite（board-db.ts、決定記録 0011）、決定記録はリポジトリの docs/decisions/ に置く。
 
 import { readFileSync, readdirSync, writeFileSync, renameSync, mkdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-import { z } from "zod";
+import type { z } from "zod";
+import { appendEvent, board, eventsOf, write, type BoardEvent } from "./board-db.ts";
 import { withLock } from "./lock.ts";
+import { introducedProblems, ruleProblems } from "./rules.ts";
+import {
+  DECISION_STATUSES,
+  Lesson,
+  LessonInput,
+  Project,
+  Task,
+  type Author,
+  type Decision,
+  type GitInfo,
+  type NewTask,
+  type Snapshot,
+  type TaskUpdateInput,
+} from "./schema.ts";
 import { mainWorktreeOf } from "./worktree.ts";
 
-export const TASK_STATUSES = ["todo", "doing", "review", "blocked", "done", "cancelled"] as const;
-export const PRIORITIES = ["high", "normal", "low"] as const;
-export const MILESTONE_STATUSES = ["planned", "active", "done"] as const;
-export const DECISION_STATUSES = ["提案", "採用", "却下", "置き換え"] as const;
+export * from "./schema.ts";
+export { describeTasks, nextTasks, type TaskView } from "./describe.ts";
 
-export const TaskStatus = z.enum(TASK_STATUSES);
-export type TaskStatus = z.infer<typeof TaskStatus>;
-export const Priority = z.enum(PRIORITIES);
-export type Priority = z.infer<typeof Priority>;
-
-// 依存先がこの状態なら「終わった」とみなす
-const FINISHED: readonly TaskStatus[] = ["done", "cancelled"];
-
-// 誰が書いたか。ユーザーが画面から入れたものは user、MCP や AI の編集は ai
-export const Author = z.enum(["user", "ai"]);
-export type Author = z.infer<typeof Author>;
-
-// ボードは複数の版のコード（worktree ごとの MCP）が読み書きする。知らない項目を落とすと、新しい版が書いたものを古い版が消してしまうので、
-// 読んでから書き戻すものは looseObject にして残す（T-039）
-const Note = z.looseObject({ at: z.string(), text: z.string(), by: Author.optional() });
-
-export const Task = z.looseObject({
-  id: z.string().regex(/^T-\d{3,}$/),
-  title: z.string().min(1),
-  status: TaskStatus,
-  milestone: z.string().nullable().default(null),
-  parent: z.string().nullable().default(null),
-  dependsOn: z.array(z.string()).default([]),
-  priority: Priority.default("normal"),
-  labels: z.array(z.string()).default([]),
-  // 触る予定のパスの接頭辞。並行して着手してよいかの判断に使う（決定記録 0010）
-  paths: z.array(z.string()).default([]),
-  description: z.string().default(""),
-  branch: z.string().nullable().default(null),
-  notes: z.array(Note).default([]),
-  createdBy: Author.default("ai"),
-  created: z.string(),
-  updated: z.string(),
-});
-export type Task = z.infer<typeof Task>;
-
-export const Milestone = z.looseObject({
-  id: z.string(),
-  title: z.string(),
-  goal: z.string().default(""),
-  status: z.enum(MILESTONE_STATUSES),
-});
-export type Milestone = z.infer<typeof Milestone>;
-
-export const Project = z.looseObject({
-  name: z.string(),
-  summary: z.string().default(""),
-  milestones: z.array(Milestone).default([]),
-});
-export type Project = z.infer<typeof Project>;
-
-export type Decision = {
-  number: number;
-  file: string;
-  title: string;
-  status: string;
-  date: string;
-  body: string;
-};
-
-export type GitInfo = {
-  branch: string | null;
-  dirty: number;
-  commits: { hash: string; subject: string; date: string }[];
-};
-
-export type Snapshot = {
-  project: Project;
-  tasks: Task[];
-  decisions: Decision[];
-  git: GitInfo;
-  errors: string[];
-  generatedAt: string;
-};
-
-// 作業用の worktree から呼ばれても、main の worktree のボードを使う（決定記録 0010）
+// 作業用の worktree から呼ばれても、main の worktree の決定記録を使う（決定記録 0010）
 const ownRoot = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
 
 export function repoRoot(): string {
@@ -97,9 +35,6 @@ export function repoRoot(): string {
 }
 
 export const paths = {
-  dev: () => join(repoRoot(), "dev"),
-  project: () => join(repoRoot(), "dev", "project.json"),
-  tasks: () => join(repoRoot(), "dev", "tasks"),
   decisions: () => join(repoRoot(), "docs", "decisions"),
 };
 
@@ -113,109 +48,61 @@ function today(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// 書きかけのファイルを読まれないよう、一時ファイルに書いてから rename する
-function writeAtomic(file: string, content: string): void {
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, content);
-  renameSync(tmp, file);
+const padded = (prefix: string, n: number) => `${prefix}-${String(n).padStart(3, "0")}`;
+
+// 行の JSON を読む。壊れた行があっても他は読めるよう、例外ではなく結果で返す
+function parseRow<T>(schema: z.ZodType<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {
+  let json: unknown;
+  try {
+    json = JSON.parse(String(data));
+  } catch {
+    return { success: false, error: "JSON として読めない" };
+  }
+  const parsed = schema.safeParse(json);
+  return parsed.success ? { success: true, data: parsed.data } : { success: false, error: parsed.error.issues[0]?.message ?? "形式が合わない" };
 }
 
-function writeJson(file: string, value: unknown): void {
-  writeAtomic(file, JSON.stringify(value, null, 2) + "\n");
-}
-
-// 読んでから書くまで（採番を含む）を、ほかのプロセスと 1 つずつ行う。同時に書くと、同じ番号で上書きされて消える
-function locked<T>(fn: () => T): T {
-  const dir = join(repoRoot(), ".dev");
-  mkdirSync(dir, { recursive: true });
-  return withLock(join(dir, "board.lock"), fn);
-}
+// ---- プロジェクトとマイルストーン ----
 
 export function readProject(): Project {
-  return Project.parse(JSON.parse(readFileSync(paths.project(), "utf8")));
+  const row = board().prepare("SELECT data FROM project WHERE id = 1").get();
+  return row ? Project.parse(JSON.parse(String(row.data))) : { name: basename(repoRoot()), summary: "", milestones: [] };
 }
 
-export function updateProject(change: (project: Project) => Project): Project {
-  return locked(() => {
-    const project = Project.parse(change(readProject()));
-    writeJson(paths.project(), project);
-    return project;
-  });
-}
+// ---- タスク ----
 
-function taskFile(id: string): string {
-  return join(paths.tasks(), `${id}.json`);
-}
-
-// 壊れたファイルがあっても他は読めるよう、エラーは配列で返す
+// 壊れた行があっても他は読めるよう、エラーは配列で返す（新しい版のコードが書いたものを古い版が読むときなど）
 export function readTasks(): { tasks: Task[]; errors: string[] } {
-  const dir = paths.tasks();
-  if (!existsSync(dir)) return { tasks: [], errors: [] };
   const tasks: Task[] = [];
   const errors: string[] = [];
-  for (const name of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
-    try {
-      tasks.push(Task.parse(JSON.parse(readFileSync(join(dir, name), "utf8"))));
-    } catch (e) {
-      errors.push(`dev/tasks/${name}: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  for (const row of board().prepare("SELECT id, data FROM tasks ORDER BY number").all()) {
+    const parsed = parseRow(Task, row.data);
+    if (parsed.success) tasks.push(parsed.data);
+    else errors.push(`${String(row.id)}: ${parsed.error}`);
   }
   return { tasks, errors };
 }
 
 export function getTask(id: string): Task {
-  const file = taskFile(id);
-  if (!existsSync(file)) throw new Error(`タスク ${id} は存在しない`);
-  return Task.parse(JSON.parse(readFileSync(file, "utf8")));
+  const row = board().prepare("SELECT data FROM tasks WHERE id = ?").get(id);
+  if (!row) throw new Error(`タスク ${id} は存在しない`);
+  return Task.parse(JSON.parse(String(row.data)));
 }
 
-function nextTaskId(): string {
-  const dir = paths.tasks();
-  const nums = existsSync(dir)
-    ? readdirSync(dir)
-        .map((f) => /^T-(\d+)\.json$/.exec(f)?.[1])
-        .filter((n): n is string => n !== undefined)
-        .map(Number)
-    : [];
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `T-${String(next).padStart(3, "0")}`;
+// タスクの変更の履歴（作成、項目の変更、メモ）を古い順に返す
+export function taskHistory(id: string): BoardEvent[] {
+  getTask(id);
+  return eventsOf(board(), id);
 }
 
 function assertMilestone(milestone: string | null | undefined): void {
   if (!milestone) return;
   const ids = readProject().milestones.map((m) => m.id);
-  if (!ids.includes(milestone)) {
-    throw new Error(`マイルストーン ${milestone} は dev/project.json にない（${ids.join(", ")}）`);
-  }
+  if (!ids.includes(milestone)) throw new Error(`マイルストーン ${milestone} はボードにない（${ids.join(", ")}）`);
 }
 
-// タスクの追加・更新の入力。MCP のツールと画面の API で共有する
-export const TaskCreateInput = z.object({
-  title: z.string().trim().min(1),
-  description: z.string().optional().describe("目的・完了条件。Markdown 可"),
-  status: TaskStatus.optional().describe("既定は todo"),
-  milestone: z.string().nullable().optional().describe("dev/project.json のマイルストーン ID"),
-  labels: z.array(z.string()).optional(),
-  paths: z
-    .array(z.string().trim().min(1))
-    .optional()
-    .describe("触る予定のパスの接頭辞（例: tools/devboard/）。置き換え。空なら、ほかのタスクと並行させない"),
-  branch: z.string().nullable().optional(),
-  parent: z.string().nullable().optional().describe("分解元の親タスク ID"),
-  dependsOn: z.array(z.string()).optional().describe("先に終わっている必要があるタスク ID（置き換え）"),
-  priority: Priority.optional().describe("既定は normal"),
-});
-export type NewTask = z.infer<typeof TaskCreateInput> & { createdBy?: Author };
-
-export const TaskUpdateInput = TaskCreateInput.partial().extend({
-  labels: z.array(z.string()).optional().describe("置き換え（追記ではない）"),
-  parent: z.string().nullable().optional().describe("分解元の親タスク ID。null で外す"),
-  note: z.string().optional().describe("メモの履歴に追記する。経過・判断・次にやること"),
-});
-
-// 親と依存先が存在し、自分自身や循環を指していないことを確かめる
-function assertLinks(id: string, parent: string | null | undefined, dependsOn: string[] | undefined): void {
-  const { tasks } = readTasks();
+// 親と依存先が存在し、自分自身や循環を指していないことを確かめる。決まりの検査より先に、分かりやすい言葉で断る
+function assertLinks(tasks: Task[], id: string, parent: string | null | undefined, dependsOn: string[] | undefined): void {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const exists = (x: string) => {
     if (!byId.has(x)) throw new Error(`タスク ${x} は存在しない`);
@@ -241,13 +128,28 @@ function assertLinks(id: string, parent: string | null | undefined, dependsOn: s
   }
 }
 
+// AI の書き込みは、ボードの決まりに新しく反するなら断る。ユーザーが画面から書くものは断らず、problems に出して AI が気づけるようにする
+function assertRules(before: Task[], after: Task[], by: Author): void {
+  if (by === "user") return;
+  const milestones = new Set(readProject().milestones.map((m) => m.id));
+  const introduced = introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones));
+  if (introduced.length) throw new Error(introduced.map((p) => `${p.task}: ${p.message}`).join("\n"));
+}
+
+function saveTask(task: Task, number: number): void {
+  board().prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data").run(task.id, number, JSON.stringify(task));
+}
+
 export function createTask(input: NewTask): Task {
   assertMilestone(input.milestone);
-  return locked(() => {
-    const id = nextTaskId();
-    assertLinks(id, input.parent, input.dependsOn);
-    mkdirSync(paths.tasks(), { recursive: true });
+  const db = board();
+  return write(db, () => {
+    const { tasks } = readTasks();
+    const number = Number(db.prepare("SELECT coalesce(max(number), 0) + 1 AS next FROM tasks").get()?.next);
+    const id = padded("T", number);
+    assertLinks(tasks, id, input.parent, input.dependsOn);
     const at = now();
+    const by = input.createdBy ?? "ai";
     const task = Task.parse({
       id,
       title: input.title,
@@ -261,134 +163,111 @@ export function createTask(input: NewTask): Task {
       description: input.description ?? "",
       branch: input.branch ?? null,
       notes: [],
-      createdBy: input.createdBy ?? "ai",
+      createdBy: by,
       created: at,
       updated: at,
     });
-    writeJson(taskFile(task.id), task);
+    assertRules(tasks, [...tasks, task], by);
+    saveTask(task, number);
+    appendEvent(db, { at, actor: by, kind: "task.created", subject: id, data: { task } });
     return task;
   });
 }
 
 export type TaskPatch = z.infer<typeof TaskUpdateInput> & { by?: Author };
 
+// 項目ごとの変更の前後。メモは別のイベントにするので含めない
+function changesOf(before: Task, after: Task): Record<string, { from: unknown; to: unknown }> {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)].filter((k) => k !== "notes" && k !== "updated"));
+  return Object.fromEntries(
+    [...keys].filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k])).map((k) => [k, { from: before[k] ?? null, to: after[k] ?? null }]),
+  );
+}
+
 export function updateTask(id: string, patch: TaskPatch): Task {
   if (patch.milestone !== undefined) assertMilestone(patch.milestone);
-  return locked(() => {
+  const db = board();
+  return write(db, () => {
     const current = getTask(id);
-    assertLinks(id, patch.parent, patch.dependsOn);
+    const { tasks } = readTasks();
+    assertLinks(tasks, id, patch.parent, patch.dependsOn);
     const { note, by = "ai", ...fields } = patch;
     const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     const at = now();
-    const notes = note?.trim() ? [...current.notes, { at, text: note.trim(), by }] : current.notes;
-    const task = Task.parse({ ...current, ...defined, notes, id: current.id, updated: at });
-    writeJson(taskFile(id), task);
+    const added = note?.trim() ? { at, text: note.trim(), by } : null;
+    const task = Task.parse({ ...current, ...defined, notes: added ? [...current.notes, added] : current.notes, id: current.id, updated: at });
+    assertRules(tasks, tasks.map((t) => (t.id === id ? task : t)), by);
+    const number = Number(db.prepare("SELECT number FROM tasks WHERE id = ?").get(id)?.number);
+    saveTask(task, number);
+    const changes = changesOf(current, task);
+    if (Object.keys(changes).length) appendEvent(db, { at, actor: by, kind: "task.changed", subject: id, data: { changes } });
+    if (added) appendEvent(db, { at, actor: by, kind: "task.noted", subject: id, data: { note: added } });
     return task;
   });
 }
 
-// 一覧の各タスクに、進め方の判断に使う情報を足したもの
-export type TaskView = Task & {
-  // まだ終わっていない依存先
-  waitingOn: { id: string; status: TaskStatus | "missing" }[];
-  // 子タスクの ID
-  children: string[];
-  // 今すぐ着手できる（未着手・子を持たない・依存先がすべて終わっている）
-  ready: boolean;
-  // 依存をたどった先が確認待ち・ブロック・存在しないなどで、AI だけでは進められない理由
-  stuck: string | null;
-  // 子を持つ親で、子がすべて終わっている（親を閉じてよい）
-  closable: boolean;
-  // 未着手のタスクを、依存と優先度を考えて並べたときの順番（1 始まり）。進められないものは null
-  order: number | null;
-  // 触る範囲が重なる、ほかの進行中のタスク。空のものだけを並行して着手する
-  overlaps: string[];
-};
-
-const ACTIVE: readonly TaskStatus[] = ["todo", "doing"];
-
-const normalizePath = (path: string) => path.replace(/^\.\//, "").replace(/\/+$/, "");
-const contains = (outer: string, inner: string) => inner === outer || inner.startsWith(`${outer}/`);
-
-// 範囲を書いていないタスクは、どこを触るか分からないので、すべてと重なるものとして扱う
-function pathsOverlap(a: string[], b: string[]): boolean {
-  if (!a.length || !b.length) return true;
-  return a.map(normalizePath).some((x) => b.map(normalizePath).some((y) => contains(x, y) || contains(y, x)));
-}
-
-// ユーザーの確認や対応がないと先に進まない状態
-const NEEDS_USER: readonly TaskStatus[] = ["review", "blocked"];
-
-export function describeTasks(tasks: Task[]): TaskView[] {
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  const childrenOf = new Map<string, string[]>();
-  for (const t of tasks) if (t.parent) childrenOf.set(t.parent, [...(childrenOf.get(t.parent) ?? []), t.id]);
-  const finished = (id: string) => FINISHED.includes(byId.get(id)?.status ?? "todo");
-
-  // 依存をたどって、AI だけでは解消できない理由を探す
-  const stuckMemo = new Map<string, string | null>();
-  const stuckOf = (id: string, seen = new Set<string>()): string | null => {
-    if (stuckMemo.has(id)) return stuckMemo.get(id)!;
-    if (seen.has(id)) return null;
-    seen.add(id);
-    const t = byId.get(id);
-    let reason: string | null = null;
-    for (const d of t?.dependsOn ?? []) {
-      const dep = byId.get(d);
-      if (!dep) reason = `依存先 ${d} が存在しない`;
-      else if (NEEDS_USER.includes(dep.status)) reason = `依存先 ${d} が${dep.status === "review" ? "確認待ち" : "ブロック"}`;
-      else if (!FINISHED.includes(dep.status)) {
-        const inner = stuckOf(d, seen);
-        if (inner) reason = `${d} 経由: ${inner}`;
-      }
-      if (reason) break;
-    }
-    stuckMemo.set(id, reason);
-    return reason;
-  };
-
-  // 未着手で子を持たないものを、依存の順を守りつつ優先度の高い順に並べる
-  const rank = (p: Priority) => PRIORITIES.indexOf(p);
-  const plannable = tasks.filter((t) => t.status === "todo" && !childrenOf.has(t.id) && !stuckOf(t.id));
-  const remaining = new Set(plannable.map((t) => t.id));
-  const order = new Map<string, number>();
-  while (remaining.size) {
-    const available = plannable
-      .filter((t) => remaining.has(t.id))
-      .filter((t) => t.dependsOn.every((d) => finished(d) || order.has(d) || (byId.get(d)?.status === "doing")))
-      .sort((x, y) => rank(x.priority) - rank(y.priority) || x.id.localeCompare(y.id));
-    const pick = available[0];
-    if (!pick) break; // 子を持つ親に依存しているなど、並べられないものは残す
-    order.set(pick.id, order.size + 1);
-    remaining.delete(pick.id);
-  }
-
-  // 子を持つ親は作業そのものではないので、範囲の比べ先に含めない
-  const doing = tasks.filter((t) => t.status === "doing" && !childrenOf.has(t.id));
-  return tasks.map((t) => {
-    const waitingOn = t.dependsOn
-      .filter((d) => !finished(d))
-      .map((d) => ({ id: d, status: byId.get(d)?.status ?? ("missing" as const) }));
-    const children = childrenOf.get(t.id) ?? [];
-    const stuck = t.status === "todo" ? stuckOf(t.id) : null;
-    return {
-      ...t,
-      waitingOn,
-      children,
-      ready: t.status === "todo" && children.length === 0 && waitingOn.length === 0,
-      stuck,
-      closable: children.length > 0 && !FINISHED.includes(t.status) && children.every(finished),
-      order: order.get(t.id) ?? null,
-      overlaps: ACTIVE.includes(t.status) ? doing.filter((d) => d.id !== t.id && pathsOverlap(t.paths, d.paths)).map((d) => d.id) : [],
-    };
+export function updateProject(change: (project: Project) => Project, by: Author = "ai"): Project {
+  const db = board();
+  return write(db, () => {
+    const before = readProject();
+    const after = Project.parse(change(structuredClone(before)));
+    const { tasks } = readTasks();
+    const used = tasks.flatMap((t) => (t.milestone && !after.milestones.some((m) => m.id === t.milestone) ? [`${t.id}（${t.milestone}）`] : []));
+    if (used.length) throw new Error(`タスクが使っているマイルストーンは消せない: ${used.join(", ")}`);
+    db.prepare("INSERT INTO project (id, data) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data").run(JSON.stringify(after));
+    appendEvent(db, { at: now(), actor: by, kind: "project.changed", subject: "project", data: { from: before, to: after } });
+    return after;
   });
 }
 
-// 今すぐ着手できるタスクを、着手する順に返す
-export function nextTasks(tasks: Task[]): TaskView[] {
-  return describeTasks(tasks)
-    .filter((t) => t.ready)
-    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id));
+// ---- 教訓 ----
+
+export function readLessons(): { lessons: Lesson[]; errors: string[] } {
+  const lessons: Lesson[] = [];
+  const errors: string[] = [];
+  for (const row of board().prepare("SELECT id, data FROM lessons ORDER BY number").all()) {
+    const parsed = parseRow(Lesson, row.data);
+    if (parsed.success) lessons.push(parsed.data);
+    else errors.push(`${String(row.id)}: ${parsed.error}`);
+  }
+  return { lessons, errors };
+}
+
+export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
+  if (input.task) getTask(input.task);
+  const db = board();
+  return write(db, () => {
+    const number = Number(db.prepare("SELECT coalesce(max(number), 0) + 1 AS next FROM lessons").get()?.next);
+    const lesson = Lesson.parse({
+      id: padded("L", number),
+      title: input.title,
+      problem: input.problem,
+      cause: input.cause ?? "",
+      fix: input.fix,
+      task: input.task ?? null,
+      tags: input.tags ?? [],
+      created: now(),
+    });
+    db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(lesson.id, number, JSON.stringify(lesson));
+    appendEvent(db, { at: lesson.created, actor: "ai", kind: "lesson.created", subject: lesson.id, data: { lesson } });
+    return lesson;
+  });
+}
+
+// ---- 決定記録（リポジトリの docs/decisions/） ----
+
+// 書きかけのファイルを読まれないよう、一時ファイルに書いてから rename する
+function writeAtomic(file: string, content: string): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, content);
+  renameSync(tmp, file);
+}
+
+// 番号を決めてから書くまでを、ほかのプロセスと 1 つずつ行う
+function lockedDecisions<T>(fn: () => T): T {
+  const dir = join(repoRoot(), ".dev");
+  mkdirSync(dir, { recursive: true });
+  return withLock(join(dir, "decisions.lock"), fn);
 }
 
 // docs/decisions/NNNN-slug.md の先頭にある「# NNNN. タイトル」「- 状態: 」「- 日付: 」を読む
@@ -439,7 +318,7 @@ export function createDecision(input: NewDecision): Decision {
     input.consequences.trim(),
     "",
   ].join("\n");
-  return locked(() => {
+  return lockedDecisions(() => {
     const dir = paths.decisions();
     mkdirSync(dir, { recursive: true });
     const numbers = readDecisions().map((d) => d.number);
@@ -452,7 +331,7 @@ export function createDecision(input: NewDecision): Decision {
 }
 
 export function setDecisionStatus(number: number, status: (typeof DECISION_STATUSES)[number]): Decision {
-  return locked(() => {
+  return lockedDecisions(() => {
     const d = readDecisions().find((x) => x.number === number);
     if (!d) throw new Error(`決定記録 ${number} は存在しない`);
     if (!/^-\s*状態:.*$/m.test(d.body)) throw new Error(`${d.file} に「- 状態:」の行がない`);
@@ -462,6 +341,8 @@ export function setDecisionStatus(number: number, status: (typeof DECISION_STATU
     return parseDecision(name, text);
   });
 }
+
+// ---- git と、まとめての読み取り ----
 
 function git(args: string[]): string | null {
   try {
@@ -487,78 +368,12 @@ export function readGit(limit = 8): GitInfo {
 
 export function snapshot(): Snapshot {
   const errors: string[] = [];
-  let project: Project = { name: "nagaya", summary: "", milestones: [] };
+  let project: Project = { name: basename(repoRoot()), summary: "", milestones: [] };
   try {
     project = readProject();
   } catch (e) {
-    errors.push(`dev/project.json: ${e instanceof Error ? e.message : String(e)}`);
+    errors.push(`project: ${e instanceof Error ? e.message : String(e)}`);
   }
   const { tasks, errors: taskErrors } = readTasks();
-  errors.push(...taskErrors);
-  return { project, tasks, decisions: readDecisions(), git: readGit(), errors, generatedAt: now() };
-}
-
-// 教訓: うまくいかなかったことと、その対処。似た作業の前に recall で引き出して、同じ失敗を繰り返さないために残す
-export const Lesson = z.object({
-  id: z.string().regex(/^L-\d{3,}$/),
-  title: z.string().min(1),
-  problem: z.string().min(1),
-  cause: z.string().default(""),
-  fix: z.string().min(1),
-  task: z.string().nullable().default(null),
-  tags: z.array(z.string()).default([]),
-  created: z.string(),
-});
-export type Lesson = z.infer<typeof Lesson>;
-
-export const LessonInput = z.object({
-  title: z.string().trim().min(1).describe("何についての教訓か（1 行）"),
-  problem: z.string().trim().min(1).describe("何が起きたか、どう気づいたか"),
-  cause: z.string().optional().describe("原因"),
-  fix: z.string().trim().min(1).describe("どう対処したか。次に同じ場面でどうするか"),
-  task: z.string().nullable().optional().describe("関係するタスク ID"),
-  tags: z.array(z.string()).optional(),
-});
-
-function lessonsDir(): string {
-  return join(paths.dev(), "lessons");
-}
-
-export function readLessons(): { lessons: Lesson[]; errors: string[] } {
-  const dir = lessonsDir();
-  if (!existsSync(dir)) return { lessons: [], errors: [] };
-  const lessons: Lesson[] = [];
-  const errors: string[] = [];
-  for (const name of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
-    try {
-      lessons.push(Lesson.parse(JSON.parse(readFileSync(join(dir, name), "utf8"))));
-    } catch (e) {
-      errors.push(`dev/lessons/${name}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-  return { lessons, errors };
-}
-
-export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
-  if (input.task) getTask(input.task);
-  return locked(() => {
-    const dir = lessonsDir();
-    mkdirSync(dir, { recursive: true });
-    const numbers = readdirSync(dir)
-      .map((f) => /^L-(\d+)\.json$/.exec(f)?.[1])
-      .filter((n): n is string => n !== undefined)
-      .map(Number);
-    const lesson = Lesson.parse({
-      id: `L-${String((numbers.length ? Math.max(...numbers) : 0) + 1).padStart(3, "0")}`,
-      title: input.title,
-      problem: input.problem,
-      cause: input.cause ?? "",
-      fix: input.fix,
-      task: input.task ?? null,
-      tags: input.tags ?? [],
-      created: now(),
-    });
-    writeJson(join(dir, `${lesson.id}.json`), lesson);
-    return lesson;
-  });
+  return { project, tasks, decisions: readDecisions(), git: readGit(), errors: [...errors, ...taskErrors], generatedAt: now() };
 }

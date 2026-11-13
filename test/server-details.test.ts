@@ -1,18 +1,17 @@
 // サーバの、経路・Host・Origin・本文の大きさ・変更通知の細かい振る舞いを確かめる。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { request, type IncomingHttpHeaders } from "node:http";
+import { useTempBoard } from "./temp-board.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-devboard-server-details-"));
-process.env.NAGAYA_ROOT = root;
+const root = useTempBoard("devboard-server-details");
 process.env.NAGAYA_DEV_HOSTS = " extra.example.ts.net , ,second.example.ts.net";
-mkdirSync(join(root, "dev", "tasks"), { recursive: true });
 mkdirSync(join(root, "docs", "decisions"), { recursive: true });
-writeFileSync(join(root, "dev", "project.json"), JSON.stringify({ name: "t", milestones: [] }));
+const store = await import("../src/store.ts");
+store.updateProject(() => ({ name: "t", summary: "", milestones: [] }));
 
 const { startServer, instanceFile, remoteHosts } = await import("../src/server.ts");
 const TS = "mac.example.ts.net";
@@ -133,12 +132,17 @@ test("ボードのファイルが変わると、画面に知らせる", async ()
   req.end();
   try {
     await until(() => received.includes(": connected\n\n"));
+    const changes = () => received.split("event: change\ndata: {}\n\n").length;
     // 一時ファイル（書きかけ）では知らせない。先に書いて、通知が来ないことを次の通知までの間で確かめる
-    writeFileSync(join(root, "dev", "tasks", "T-900.json.123.tmp"), "{}");
+    writeFileSync(join(root, "docs", "decisions", "0900-sample.md.123.tmp"), "{}");
     await new Promise((r) => setTimeout(r, 600));
-    const before = received.split("event: change\ndata: {}\n\n").length;
+    const before = changes();
     writeFileSync(join(root, "docs", "decisions", "0900-sample.md"), "# 0900. 見本\n");
-    await until(() => received.split("event: change\ndata: {}\n\n").length > before);
+    await until(() => changes() > before);
+    // ボード（SQLite）への書き込みでも知らせる。別のプロセスが書いたときと同じく、イベントの番号で気づく
+    const afterDecision = changes();
+    store.createTask({ title: "通知の確認" });
+    await until(() => changes() > afterDecision);
   } finally {
     req.destroy();
   }
