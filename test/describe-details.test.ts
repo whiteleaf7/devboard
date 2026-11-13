@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { describeTasks, nextTasks, type Task } from "../src/store.ts";
 
-const base = { milestone: null, labels: [], description: "", branch: null, notes: [], createdBy: "ai" as const, created: "", updated: "" };
+const base = { milestone: null, labels: [], paths: [], description: "", branch: null, notes: [], createdBy: "ai" as const, created: "", updated: "" };
 const t = (id: string, fields: Partial<Task> = {}): Task => ({
   ...base, id, title: id, status: "todo", parent: null, dependsOn: [], priority: "normal", ...fields,
 });

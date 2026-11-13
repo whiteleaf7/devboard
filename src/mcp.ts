@@ -97,8 +97,8 @@ server.registerTool(
   "list_tasks",
   {
     description: `タスクの一覧。未着手（todo）は着手する順（order）に並び、それ以外は ID 順。
-各タスクに ready（今すぐ着手できる）、waitingOn（終わっていない依存先）、stuck（AI だけでは進められない理由）、children、closable（子がすべて終わった親）が付く。
-「未着手をすべて進める」ときは status: todo で全体を見て、ready のものから順に進める。説明も要るときは detail: true`,
+各タスクに ready（今すぐ着手できる）、waitingOn（終わっていない依存先）、stuck（AI だけでは進められない理由）、children、closable（子がすべて終わった親）、overlaps（触る範囲 paths が重なる進行中のタスク）が付く。
+「未着手をすべて進める」ときは status: todo で全体を見て、ready のものから順に進める。worktree で並行して着手するのは、ready で overlaps が空のものだけ。説明も要るときは detail: true`,
     inputSchema: {
       status: z
         .union([TaskStatus, z.array(TaskStatus)])

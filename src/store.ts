@@ -36,6 +36,8 @@ export const Task = z.object({
   dependsOn: z.array(z.string()).default([]),
   priority: Priority.default("normal"),
   labels: z.array(z.string()).default([]),
+  // 触る予定のパスの接頭辞。並行して着手してよいかの判断に使う（決定記録 0010）
+  paths: z.array(z.string()).default([]),
   description: z.string().default(""),
   branch: z.string().nullable().default(null),
   notes: z.array(Note).default([]),
@@ -192,6 +194,10 @@ export const TaskCreateInput = z.object({
   status: TaskStatus.optional().describe("既定は todo"),
   milestone: z.string().nullable().optional().describe("dev/project.json のマイルストーン ID"),
   labels: z.array(z.string()).optional(),
+  paths: z
+    .array(z.string().trim().min(1))
+    .optional()
+    .describe("触る予定のパスの接頭辞（例: tools/devboard/）。置き換え。空なら、ほかのタスクと並行させない"),
   branch: z.string().nullable().optional(),
   parent: z.string().nullable().optional().describe("分解元の親タスク ID"),
   dependsOn: z.array(z.string()).optional().describe("先に終わっている必要があるタスク ID（置き換え）"),
@@ -249,6 +255,7 @@ export function createTask(input: NewTask): Task {
       dependsOn: input.dependsOn ?? [],
       priority: input.priority ?? "normal",
       labels: input.labels ?? [],
+      paths: input.paths ?? [],
       description: input.description ?? "",
       branch: input.branch ?? null,
       notes: [],
@@ -292,7 +299,20 @@ export type TaskView = Task & {
   closable: boolean;
   // 未着手のタスクを、依存と優先度を考えて並べたときの順番（1 始まり）。進められないものは null
   order: number | null;
+  // 触る範囲が重なる、ほかの進行中のタスク。空のものだけを並行して着手する
+  overlaps: string[];
 };
+
+const ACTIVE: readonly TaskStatus[] = ["todo", "doing"];
+
+const normalizePath = (path: string) => path.replace(/^\.\//, "").replace(/\/+$/, "");
+const contains = (outer: string, inner: string) => inner === outer || inner.startsWith(`${outer}/`);
+
+// 範囲を書いていないタスクは、どこを触るか分からないので、すべてと重なるものとして扱う
+function pathsOverlap(a: string[], b: string[]): boolean {
+  if (!a.length || !b.length) return true;
+  return a.map(normalizePath).some((x) => b.map(normalizePath).some((y) => contains(x, y) || contains(y, x)));
+}
 
 // ユーザーの確認や対応がないと先に進まない状態
 const NEEDS_USER: readonly TaskStatus[] = ["review", "blocked"];
@@ -341,6 +361,7 @@ export function describeTasks(tasks: Task[]): TaskView[] {
     remaining.delete(pick.id);
   }
 
+  const doing = tasks.filter((t) => t.status === "doing");
   return tasks.map((t) => {
     const waitingOn = t.dependsOn
       .filter((d) => !finished(d))
@@ -355,6 +376,7 @@ export function describeTasks(tasks: Task[]): TaskView[] {
       stuck,
       closable: children.length > 0 && !FINISHED.includes(t.status) && children.every(finished),
       order: order.get(t.id) ?? null,
+      overlaps: ACTIVE.includes(t.status) ? doing.filter((d) => d.id !== t.id && pathsOverlap(t.paths, d.paths)).map((d) => d.id) : [],
     };
   });
 }

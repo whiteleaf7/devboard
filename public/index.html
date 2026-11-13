@@ -265,6 +265,7 @@
       <label>依存（先に終わるタスク）<input name="dependsOn" placeholder="T-005, T-006"></label>
       <label>ラベル<input name="labels" placeholder="research, poc"></label>
     </div>
+    <label>触る範囲（並行して進めてよいかの判断に使う）<input name="paths" placeholder="tools/devboard/, docs/harness.md"></label>
     <label>説明<textarea name="description" placeholder="目的や完了の条件"></textarea></label>
     <label>メモを追記<textarea name="note" placeholder="経過や AI への補足。履歴に残る" style="min-height: 64px"></textarea></label>
     <div class="actions">
@@ -390,6 +391,7 @@ function renderTaskView(task) {
     ["子タスク", children.length && children.map((c) => taskLink(c.id)), "stack"],
     ["ラベル", task.labels.length && task.labels.map((l) => el("span", { className: "tag", textContent: l }))],
     ["ブランチ", task.branch && [el("code", { textContent: task.branch })]],
+    ["触る範囲", task.paths.length && task.paths.map((p) => el("code", { textContent: p })), "stack"],
     ["登録", [`${task.createdBy === "user" ? "あなた" : "AI"} · ${fmt(task.created)}`]],
     ["更新", [fmt(task.updated)]],
   ];
@@ -436,6 +438,7 @@ function openEditor(task) {
   f.priority.value = task?.priority ?? "normal";
   f.dependsOn.value = (task?.dependsOn ?? []).join(", ");
   f.labels.value = (task?.labels ?? []).join(", ");
+  f.paths.value = (task?.paths ?? []).join(", ");
   f.description.value = task?.description ?? "";
   f.note.value = "";
   $("editor-title").textContent = task ? `${task.id} を編集` : "タスクを追加";
@@ -455,6 +458,7 @@ function formChanges() {
     parent: f.parent.value || null,
     dependsOn: splitIds(f.dependsOn.value),
     labels: splitIds(f.labels.value),
+    paths: splitIds(f.paths.value),
     description: f.description.value,
   };
   if (editing) {

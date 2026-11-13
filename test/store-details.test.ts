@@ -33,7 +33,7 @@ test("作成したタスクは既定値を持ち、ファイルに書かれる",
   const task = store.createTask({ title: "既定値", description: "説明", labels: ["x"], branch: "feat/x" });
   assert.deepEqual(
     { ...task, id: "", created: "", updated: "" },
-    { id: "", title: "既定値", status: "todo", milestone: null, parent: null, dependsOn: [], priority: "normal", labels: ["x"], description: "説明", branch: "feat/x", notes: [], createdBy: "ai", created: "", updated: "" },
+    { id: "", title: "既定値", status: "todo", milestone: null, parent: null, dependsOn: [], priority: "normal", labels: ["x"], paths: [], description: "説明", branch: "feat/x", notes: [], createdBy: "ai", created: "", updated: "" },
   );
   assert.equal(task.created, task.updated);
   assert.ok(!Number.isNaN(Date.parse(task.created)));
