@@ -5,6 +5,8 @@ import { readFileSync, readdirSync, writeFileSync, renameSync, mkdirSync, exists
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { z } from "zod";
+import { withLock } from "./lock.ts";
+import { mainWorktreeOf } from "./worktree.ts";
 
 export const TASK_STATUSES = ["todo", "doing", "review", "blocked", "done", "cancelled"] as const;
 export const PRIORITIES = ["high", "normal", "low"] as const;
@@ -82,9 +84,12 @@ export type Snapshot = {
   generatedAt: string;
 };
 
+// 作業用の worktree から呼ばれても、main の worktree のボードを使う（決定記録 0010）
+const ownRoot = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
+
 export function repoRoot(): string {
   // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
-  return process.env.NAGAYA_ROOT ?? resolve(import.meta.dirname, "../../..");
+  return process.env.NAGAYA_ROOT ?? ownRoot;
 }
 
 export const paths = {
@@ -115,12 +120,23 @@ function writeJson(file: string, value: unknown): void {
   writeAtomic(file, JSON.stringify(value, null, 2) + "\n");
 }
 
+// 読んでから書くまで（採番を含む）を、ほかのプロセスと 1 つずつ行う。同時に書くと、同じ番号で上書きされて消える
+function locked<T>(fn: () => T): T {
+  const dir = join(repoRoot(), ".dev");
+  mkdirSync(dir, { recursive: true });
+  return withLock(join(dir, "board.lock"), fn);
+}
+
 export function readProject(): Project {
   return Project.parse(JSON.parse(readFileSync(paths.project(), "utf8")));
 }
 
-export function writeProject(project: Project): void {
-  writeJson(paths.project(), Project.parse(project));
+export function updateProject(change: (project: Project) => Project): Project {
+  return locked(() => {
+    const project = Project.parse(change(readProject()));
+    writeJson(paths.project(), project);
+    return project;
+  });
 }
 
 function taskFile(id: string): string {
@@ -219,43 +235,47 @@ function assertLinks(id: string, parent: string | null | undefined, dependsOn: s
 
 export function createTask(input: NewTask): Task {
   assertMilestone(input.milestone);
-  const id = nextTaskId();
-  assertLinks(id, input.parent, input.dependsOn);
-  mkdirSync(paths.tasks(), { recursive: true });
-  const at = now();
-  const task = Task.parse({
-    id,
-    title: input.title,
-    status: input.status ?? "todo",
-    milestone: input.milestone ?? null,
-    parent: input.parent ?? null,
-    dependsOn: input.dependsOn ?? [],
-    priority: input.priority ?? "normal",
-    labels: input.labels ?? [],
-    description: input.description ?? "",
-    branch: input.branch ?? null,
-    notes: [],
-    createdBy: input.createdBy ?? "ai",
-    created: at,
-    updated: at,
+  return locked(() => {
+    const id = nextTaskId();
+    assertLinks(id, input.parent, input.dependsOn);
+    mkdirSync(paths.tasks(), { recursive: true });
+    const at = now();
+    const task = Task.parse({
+      id,
+      title: input.title,
+      status: input.status ?? "todo",
+      milestone: input.milestone ?? null,
+      parent: input.parent ?? null,
+      dependsOn: input.dependsOn ?? [],
+      priority: input.priority ?? "normal",
+      labels: input.labels ?? [],
+      description: input.description ?? "",
+      branch: input.branch ?? null,
+      notes: [],
+      createdBy: input.createdBy ?? "ai",
+      created: at,
+      updated: at,
+    });
+    writeJson(taskFile(task.id), task);
+    return task;
   });
-  writeJson(taskFile(task.id), task);
-  return task;
 }
 
 export type TaskPatch = z.infer<typeof TaskUpdateInput> & { by?: Author };
 
 export function updateTask(id: string, patch: TaskPatch): Task {
-  const current = getTask(id);
   if (patch.milestone !== undefined) assertMilestone(patch.milestone);
-  assertLinks(id, patch.parent, patch.dependsOn);
-  const { note, by = "ai", ...fields } = patch;
-  const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-  const at = now();
-  const notes = note?.trim() ? [...current.notes, { at, text: note.trim(), by }] : current.notes;
-  const task = Task.parse({ ...current, ...defined, notes, id: current.id, updated: at });
-  writeJson(taskFile(id), task);
-  return task;
+  return locked(() => {
+    const current = getTask(id);
+    assertLinks(id, patch.parent, patch.dependsOn);
+    const { note, by = "ai", ...fields } = patch;
+    const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+    const at = now();
+    const notes = note?.trim() ? [...current.notes, { at, text: note.trim(), by }] : current.notes;
+    const task = Task.parse({ ...current, ...defined, notes, id: current.id, updated: at });
+    writeJson(taskFile(id), task);
+    return task;
+  });
 }
 
 // 一覧の各タスクに、進め方の判断に使う情報を足したもの
@@ -377,15 +397,7 @@ export function createDecision(input: NewDecision): Decision {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(input.slug)) {
     throw new Error("slug は英小文字・数字・ハイフンだけにする（例: app-architecture）");
   }
-  const dir = paths.decisions();
-  mkdirSync(dir, { recursive: true });
-  const numbers = readDecisions().map((d) => d.number);
-  const number = (numbers.length ? Math.max(...numbers) : 0) + 1;
-  const nnnn = String(number).padStart(4, "0");
-  const file = `${nnnn}-${input.slug}.md`;
-  const text = [
-    `# ${nnnn}. ${input.title}`,
-    "",
+  const body = [
     `- 状態: ${input.status ?? "提案"}`,
     `- 日付: ${today()}`,
     "",
@@ -402,18 +414,28 @@ export function createDecision(input: NewDecision): Decision {
     input.consequences.trim(),
     "",
   ].join("\n");
-  writeAtomic(join(dir, file), text);
-  return parseDecision(file, text);
+  return locked(() => {
+    const dir = paths.decisions();
+    mkdirSync(dir, { recursive: true });
+    const numbers = readDecisions().map((d) => d.number);
+    const nnnn = String((numbers.length ? Math.max(...numbers) : 0) + 1).padStart(4, "0");
+    const file = `${nnnn}-${input.slug}.md`;
+    const text = `# ${nnnn}. ${input.title}\n\n${body}`;
+    writeAtomic(join(dir, file), text);
+    return parseDecision(file, text);
+  });
 }
 
 export function setDecisionStatus(number: number, status: (typeof DECISION_STATUSES)[number]): Decision {
-  const d = readDecisions().find((x) => x.number === number);
-  if (!d) throw new Error(`決定記録 ${number} は存在しない`);
-  if (!/^-\s*状態:.*$/m.test(d.body)) throw new Error(`${d.file} に「- 状態:」の行がない`);
-  const text = d.body.replace(/^-\s*状態:.*$/m, `- 状態: ${status}`);
-  const name = d.file.replace(/^docs\/decisions\//, "");
-  writeAtomic(join(paths.decisions(), name), text);
-  return parseDecision(name, text);
+  return locked(() => {
+    const d = readDecisions().find((x) => x.number === number);
+    if (!d) throw new Error(`決定記録 ${number} は存在しない`);
+    if (!/^-\s*状態:.*$/m.test(d.body)) throw new Error(`${d.file} に「- 状態:」の行がない`);
+    const text = d.body.replace(/^-\s*状態:.*$/m, `- 状態: ${status}`);
+    const name = d.file.replace(/^docs\/decisions\//, "");
+    writeAtomic(join(paths.decisions(), name), text);
+    return parseDecision(name, text);
+  });
 }
 
 function git(args: string[]): string | null {
@@ -494,22 +516,24 @@ export function readLessons(): { lessons: Lesson[]; errors: string[] } {
 
 export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
   if (input.task) getTask(input.task);
-  const dir = lessonsDir();
-  mkdirSync(dir, { recursive: true });
-  const numbers = readdirSync(dir)
-    .map((f) => /^L-(\d+)\.json$/.exec(f)?.[1])
-    .filter((n): n is string => n !== undefined)
-    .map(Number);
-  const lesson = Lesson.parse({
-    id: `L-${String((numbers.length ? Math.max(...numbers) : 0) + 1).padStart(3, "0")}`,
-    title: input.title,
-    problem: input.problem,
-    cause: input.cause ?? "",
-    fix: input.fix,
-    task: input.task ?? null,
-    tags: input.tags ?? [],
-    created: now(),
+  return locked(() => {
+    const dir = lessonsDir();
+    mkdirSync(dir, { recursive: true });
+    const numbers = readdirSync(dir)
+      .map((f) => /^L-(\d+)\.json$/.exec(f)?.[1])
+      .filter((n): n is string => n !== undefined)
+      .map(Number);
+    const lesson = Lesson.parse({
+      id: `L-${String((numbers.length ? Math.max(...numbers) : 0) + 1).padStart(3, "0")}`,
+      title: input.title,
+      problem: input.problem,
+      cause: input.cause ?? "",
+      fix: input.fix,
+      task: input.task ?? null,
+      tags: input.tags ?? [],
+      created: now(),
+    });
+    writeJson(join(dir, `${lesson.id}.json`), lesson);
+    return lesson;
   });
-  writeJson(join(dir, `${lesson.id}.json`), lesson);
-  return lesson;
 }

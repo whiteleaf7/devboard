@@ -20,8 +20,7 @@ import {
   readDecisions,
   createDecision,
   setDecisionStatus,
-  readProject,
-  writeProject,
+  updateProject,
   LessonInput,
   createLesson,
   readLessons,
@@ -188,19 +187,20 @@ server.registerTool(
     },
   },
   ({ id, title, goal, status }) =>
-    tool(() => {
-      const project = readProject();
-      const i = project.milestones.findIndex((m) => m.id === id);
-      if (i < 0) {
-        if (!title) throw new Error("新しいマイルストーンには title が必要");
-        project.milestones.push({ id, title, goal: goal ?? "", status: status ?? "planned" });
-      } else {
-        const m = project.milestones[i]!;
-        project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
-      }
-      writeProject(project);
-      return project.milestones;
-    }),
+    tool(
+      () =>
+        updateProject((project) => {
+          const i = project.milestones.findIndex((m) => m.id === id);
+          if (i < 0) {
+            if (!title) throw new Error("新しいマイルストーンには title が必要");
+            project.milestones.push({ id, title, goal: goal ?? "", status: status ?? "planned" });
+          } else {
+            const m = project.milestones[i]!;
+            project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
+          }
+          return project;
+        }).milestones,
+    ),
 );
 
 server.registerTool(
