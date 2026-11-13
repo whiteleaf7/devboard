@@ -65,4 +65,7 @@ test("触る範囲が、進行中のタスクと重なるかを返す", () => {
   assert.deepEqual(overlaps["T-006"], ["T-001", "T-002"], "範囲が無ければ、すべての進行中のタスクと重なる");
   assert.deepEqual(overlaps["T-001"], [], "自分自身とは比べない");
   assert.deepEqual(overlaps["T-007"], [], "終わったタスクは比べない");
+
+  const withParent = describeTasks([t("T-010", { status: "doing" }), t("T-011", { status: "doing", parent: "T-010", paths: ["a/"] }), t("T-012", { paths: ["b/"] })]);
+  assert.deepEqual(withParent.find((v) => v.id === "T-012")!.overlaps, [], "子を持つ親は、作業そのものではないので比べない");
 });

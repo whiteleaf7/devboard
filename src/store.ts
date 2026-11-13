@@ -363,7 +363,8 @@ export function describeTasks(tasks: Task[]): TaskView[] {
     remaining.delete(pick.id);
   }
 
-  const doing = tasks.filter((t) => t.status === "doing");
+  // 子を持つ親は作業そのものではないので、範囲の比べ先に含めない
+  const doing = tasks.filter((t) => t.status === "doing" && !childrenOf.has(t.id));
   return tasks.map((t) => {
     const waitingOn = t.dependsOn
       .filter((d) => !finished(d))
