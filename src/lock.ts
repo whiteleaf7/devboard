@@ -40,7 +40,9 @@ export function withLock<T>(dir: string, fn: () => T): T {
       if (errorCode(e) !== "EEXIST") throw e;
       if (isStale(dir)) release(dir);
       else if (Date.now() > deadline) {
-        throw new Error(`ボードのロック ${dir} が ${WAIT_MS / 1000} 秒たっても外れない。書き込み中のプロセスが無ければ、このディレクトリを消す`);
+        throw new Error(
+          `ボードのロック ${dir} が ${WAIT_MS / 1000} 秒たっても外れない。書き込み中のプロセスが無ければ、このディレクトリを消す`,
+        );
       } else sleep(5 + Math.random() * 20);
     }
   }

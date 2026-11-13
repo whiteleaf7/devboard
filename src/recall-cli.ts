@@ -14,7 +14,11 @@ if (!query) {
   process.exit(1);
 }
 
-const results = recall(query, buildDocs(readTasks().tasks, readDecisions(), readLessons().lessons), Number(values.limit) || 5);
+const results = recall(
+  query,
+  buildDocs(readTasks().tasks, readDecisions(), readLessons().lessons),
+  Number(values.limit) || 5,
+);
 if (values.json) console.log(JSON.stringify({ results }, null, 2));
 else if (results.length === 0) console.log("関係する記録は見つからなかった");
 else for (const hit of results) console.log(`${hit.id}  ${hit.title}\n    ${hit.excerpt}`);

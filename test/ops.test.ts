@@ -24,8 +24,19 @@ test("MCP のツールと同じ形の操作を順に当て、$N を前の操作�
 });
 
 test("断られた操作は、何番目かと理由を返す", () => {
-  assert.throws(() => applyOps([{ op: "create_task", args: { title: "x" } }, { op: "update_task", args: { id: "$0", status: "done" } }]), /操作 1（update_task）: .*メモ/);
+  assert.throws(
+    () =>
+      applyOps([
+        { op: "create_task", args: { title: "x" } },
+        { op: "update_task", args: { id: "$0", status: "done" } },
+      ]),
+    /操作 1（update_task）: .*メモ/,
+  );
   assert.throws(() => applyOps([{ op: "create_task", args: { title: "x", status: "wip" } }]), /操作 0/);
   assert.throws(() => applyOps([{ op: "delete_task", args: { id: "T-001" } }]), /操作 0/, "知らない操作");
-  assert.throws(() => applyOps([{ op: "update_task", args: { id: "T-001", by: "user", status: "done" } }]), /操作 0.*by/s, "書き手を変える項目は受け付けない（AI の書き込みとして扱う）");
+  assert.throws(
+    () => applyOps([{ op: "update_task", args: { id: "T-001", by: "user", status: "done" } }]),
+    /操作 0.*by/s,
+    "書き手を変える項目は受け付けない（AI の書き込みとして扱う）",
+  );
 });

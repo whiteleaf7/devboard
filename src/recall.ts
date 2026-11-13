@@ -16,7 +16,10 @@ const KANA_ONLY_WEIGHT = 0.3;
 
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
-  for (const run of text.normalize("NFKC").toLowerCase().match(/[a-z0-9]+|[\p{L}\p{N}ー]+/gu) ?? []) {
+  for (const run of text
+    .normalize("NFKC")
+    .toLowerCase()
+    .match(/[a-z0-9]+|[\p{L}\p{N}ー]+/gu) ?? []) {
     if (/^[a-z0-9]+$/.test(run)) {
       if (run.length > 1) tokens.push(run);
     } else if (run.length === 1) tokens.push(run);
@@ -27,14 +30,30 @@ export function tokenize(text: string): string[] {
 
 export function buildDocs(tasks: Task[], decisions: Decision[], lessons: Lesson[]): RecallDoc[] {
   return [
-    ...tasks.map((t): RecallDoc => ({
-      id: t.id,
-      kind: "task",
-      title: t.title,
-      body: [t.description, ...t.notes.map((n) => n.text), t.labels.join(" ")].join("\n"),
-    })),
-    ...decisions.map((d): RecallDoc => ({ id: `D-${String(d.number).padStart(4, "0")}`, kind: "decision", title: d.title, body: d.body })),
-    ...lessons.map((l): RecallDoc => ({ id: l.id, kind: "lesson", title: l.title, body: [l.problem, l.cause, l.fix, l.tags.join(" ")].join("\n") })),
+    ...tasks.map(
+      (t): RecallDoc => ({
+        id: t.id,
+        kind: "task",
+        title: t.title,
+        body: [t.description, ...t.notes.map((n) => n.text), t.labels.join(" ")].join("\n"),
+      }),
+    ),
+    ...decisions.map(
+      (d): RecallDoc => ({
+        id: `D-${String(d.number).padStart(4, "0")}`,
+        kind: "decision",
+        title: d.title,
+        body: d.body,
+      }),
+    ),
+    ...lessons.map(
+      (l): RecallDoc => ({
+        id: l.id,
+        kind: "lesson",
+        title: l.title,
+        body: [l.problem, l.cause, l.fix, l.tags.join(" ")].join("\n"),
+      }),
+    ),
   ];
 }
 
@@ -59,7 +78,13 @@ export function recall(query: string, docs: RecallDoc[], limit = 5): RecallHit[]
         const count = counts.get(term) ?? 0;
         return sum + (weight * count * (K1 + 1)) / (count + K1 * (1 - B + (B * length) / average));
       }, 0);
-      return { id: doc.id, kind: doc.kind, title: doc.title, score: Math.round(score * 100) / 100, excerpt: excerpt(doc.body, terms) };
+      return {
+        id: doc.id,
+        kind: doc.kind,
+        title: doc.title,
+        score: Math.round(score * 100) / 100,
+        excerpt: excerpt(doc.body, terms),
+      };
     })
     .filter((hit) => hit.score > 0)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
@@ -68,7 +93,10 @@ export function recall(query: string, docs: RecallDoc[], limit = 5): RecallHit[]
 
 // 質問の語をいちばん多く含む行
 function excerpt(body: string, terms: { term: string; weight: number }[]): string {
-  const lines = body.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   const scored = lines.map((line) => {
     const tokens = new Set(tokenize(line));
     return { line, score: terms.reduce((sum, { term, weight }) => sum + (tokens.has(term) ? weight : 0), 0) };

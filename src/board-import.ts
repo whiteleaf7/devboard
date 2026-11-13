@@ -50,7 +50,9 @@ function parse<T>(schema: z.ZodType<T>, where: string, text: string): T | null {
 
 function snapshotOf(at: string, files: { path: string; text: string; where: string }[]): BoardSnapshot {
   const pick = <T>(schema: z.ZodType<T>, prefix: string) =>
-    files.filter((f) => f.path.startsWith(prefix) && f.path.endsWith(".json")).flatMap((f) => parse(schema, f.where, f.text) ?? []);
+    files
+      .filter((f) => f.path.startsWith(prefix) && f.path.endsWith(".json"))
+      .flatMap((f) => parse(schema, f.where, f.text) ?? []);
   const projectFile = files.find((f) => f.path === "dev/project.json");
   return {
     at,
@@ -67,9 +69,15 @@ function historySnapshots(): BoardSnapshot[] {
     .filter(Boolean)
     .map((line) => line.split("\t") as [string, string]);
   return commits.map(([sha, at]) => {
-    const paths = git(["ls-tree", "-r", "--name-only", sha, "--", ...SOURCES]).toString().split("\n").filter(Boolean);
+    const paths = git(["ls-tree", "-r", "--name-only", sha, "--", ...SOURCES])
+      .toString()
+      .split("\n")
+      .filter(Boolean);
     const texts = readBlobs(paths.map((path) => `${sha}:${path}`));
-    return snapshotOf(at, paths.map((path, i) => ({ path, text: texts[i] ?? "", where: `${sha.slice(0, 7)}:${path}` })));
+    return snapshotOf(
+      at,
+      paths.map((path, i) => ({ path, text: texts[i] ?? "", where: `${sha.slice(0, 7)}:${path}` })),
+    );
   });
 }
 
@@ -92,7 +100,9 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const db = board();
 const existing = Number(db.prepare("SELECT count(*) AS n FROM events").get()?.n);
 if (existing > 0) {
-  console.error(`board:import: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、NAGAYA_BOARD で別のファイルを指定する`);
+  console.error(
+    `board:import: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、NAGAYA_BOARD で別のファイルを指定する`,
+  );
   process.exit(1);
 }
 
@@ -116,8 +126,10 @@ for (const s of snapshots) {
 
 const events = eventsFromSnapshots(snapshots);
 write(db, () => {
-  for (const t of latestTasks.values()) db.prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?)").run(t.id, numberOf(t.id), JSON.stringify(t));
-  for (const l of latestLessons.values()) db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(l.id, numberOf(l.id), JSON.stringify(l));
+  for (const t of latestTasks.values())
+    db.prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?)").run(t.id, numberOf(t.id), JSON.stringify(t));
+  for (const l of latestLessons.values())
+    db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(l.id, numberOf(l.id), JSON.stringify(l));
   if (latestProject) db.prepare("INSERT INTO project (id, data) VALUES (1, ?)").run(JSON.stringify(latestProject));
   for (const event of events) appendEvent(db, event);
 });
@@ -133,7 +145,9 @@ const mismatches = [
 ];
 
 console.log(`board:import: ${boardFile()}`);
-console.log(`  写し ${snapshots.length} 件（コミット ${snapshots.length - (current ? 1 : 0)}${current ? "、作業ツリー 1" : ""}）`);
+console.log(
+  `  写し ${snapshots.length} 件（コミット ${snapshots.length - (current ? 1 : 0)}${current ? "、作業ツリー 1" : ""}）`,
+);
 console.log(`  タスク ${latestTasks.size}、教訓 ${latestLessons.size}、イベント ${events.length}`);
 for (const warning of warnings) console.log(`  読めなかった: ${warning}`);
 if (mismatches.length) {

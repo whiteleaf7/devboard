@@ -18,7 +18,20 @@ test("linked worktree の中からでも、main の worktree をボードの根�
   const main = realpathSync(mkdtempSync(join(tmpdir(), "nagaya-main-")));
   const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, stdio: "ignore" });
   git(main, "init", "-q", "-b", "main");
-  git(main, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "chore: first");
+  git(
+    main,
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@example.com",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "chore: first",
+  );
   const linked = join(main, ".claude", "worktrees", "a");
   git(main, "worktree", "add", "-q", "-b", "a", linked);
 
@@ -39,7 +52,11 @@ test("複数のプロセスが同時に作っても、番号が重ならず、�
   `;
   const run = promisify(execFile);
   await Promise.all(
-    Array.from({ length: 4 }, () => run(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, NAGAYA_ROOT: root, NAGAYA_BOARD: boardFile } })),
+    Array.from({ length: 4 }, () =>
+      run(process.execPath, ["--input-type=module", "-e", script], {
+        env: { ...process.env, NAGAYA_ROOT: root, NAGAYA_BOARD: boardFile },
+      }),
+    ),
   );
 
   const db = new DatabaseSync(boardFile);

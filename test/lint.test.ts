@@ -6,10 +6,18 @@ import { Task } from "../src/schema.ts";
 
 const note = { at: "2026-11-12T00:00:00.000Z", text: "確かめた", by: "ai" };
 const task = (id: string, fields: Record<string, unknown> = {}) =>
-  Task.parse({ id, title: id, status: "todo", created: "2026-11-12T00:00:00.000Z", updated: "2026-11-12T00:00:00.000Z", ...fields });
+  Task.parse({
+    id,
+    title: id,
+    status: "todo",
+    created: "2026-11-12T00:00:00.000Z",
+    updated: "2026-11-12T00:00:00.000Z",
+    ...fields,
+  });
 const decision = (number: string, text?: string): BoardFile => ({
   file: `docs/decisions/${number}-sample.md`,
-  text: text ?? `# ${number}. 決める\n\n- 状態: 採用\n- 日付: 2026-11-12\n\n## 背景\n\nb\n\n## 決定\n\nd\n\n## 影響\n\ne\n`,
+  text:
+    text ?? `# ${number}. 決める\n\n- 状態: 採用\n- 日付: 2026-11-12\n\n## 背景\n\nb\n\n## 決定\n\nd\n\n## 影響\n\ne\n`,
 });
 const checksOf = (tasks: Task[]) => ruleProblems(tasks, new Set(["M0"])).map((p) => p.check);
 const decisionChecks = (decisions: BoardFile[]) => lintDecisions(decisions).map((p) => p.check);
@@ -30,21 +38,34 @@ test("切れたつながりと循環を見つける", () => {
   assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-009"] })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { milestone: "M9" })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-001"] })]), ["broken-link"]);
-  assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-002"] }), task("T-002", { dependsOn: ["T-001"] })]), ["broken-link", "broken-link"]);
-  assert.deepEqual(checksOf([task("T-001", { parent: "T-002" }), task("T-002", { parent: "T-001" })]), ["broken-link", "broken-link"]);
+  assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-002"] }), task("T-002", { dependsOn: ["T-001"] })]), [
+    "broken-link",
+    "broken-link",
+  ]);
+  assert.deepEqual(checksOf([task("T-001", { parent: "T-002" }), task("T-002", { parent: "T-001" })]), [
+    "broken-link",
+    "broken-link",
+  ]);
 });
 
 test("説明の無い状態、review、早すぎる親の完了を見つける", () => {
-  for (const status of ["done", "cancelled", "blocked"]) assert.deepEqual(checksOf([task("T-001", { status })]), ["unexplained-state"], status);
+  for (const status of ["done", "cancelled", "blocked"])
+    assert.deepEqual(checksOf([task("T-001", { status })]), ["unexplained-state"], status);
   assert.deepEqual(checksOf([task("T-001", { status: "doing" })]), []);
   assert.deepEqual(checksOf([task("T-001", { status: "review" })]), ["forbidden-review"]);
-  assert.deepEqual(checksOf([task("T-001", { status: "done", notes: [note] }), task("T-002", { parent: "T-001", status: "doing" })]), ["parent-closed-early"]);
+  assert.deepEqual(
+    checksOf([task("T-001", { status: "done", notes: [note] }), task("T-002", { parent: "T-001", status: "doing" })]),
+    ["parent-closed-early"],
+  );
 });
 
 test("変更で新しく増えた問題だけを返す", () => {
   const before = ruleProblems([task("T-001", { status: "done" })], new Set());
   const after = ruleProblems([task("T-001", { status: "done" }), task("T-002", { status: "blocked" })], new Set());
-  assert.deepEqual(introducedProblems(before, after).map((p) => [p.task, p.check]), [["T-002", "unexplained-state"]]);
+  assert.deepEqual(
+    introducedProblems(before, after).map((p) => [p.task, p.check]),
+    [["T-002", "unexplained-state"]],
+  );
 });
 
 test("形式の崩れた決定記録を見つける", () => {
@@ -56,5 +77,7 @@ test("形式の崩れた決定記録を見つける", () => {
   assert.deepEqual(broken(good.replace("## 影響", "## 結果")), ["invalid-decision"]);
   assert.deepEqual(broken(good.replace("# 0001.", "# 0002.")), ["invalid-decision"]);
   assert.deepEqual(broken(good, "docs/decisions/Sample.md"), ["invalid-decision"]);
-  assert.deepEqual(decisionChecks([decision("0001"), { ...decision("0001"), file: "docs/decisions/0001-other.md" }]), ["invalid-decision"]);
+  assert.deepEqual(decisionChecks([decision("0001"), { ...decision("0001"), file: "docs/decisions/0001-other.md" }]), [
+    "invalid-decision",
+  ]);
 });

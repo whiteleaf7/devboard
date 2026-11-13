@@ -38,7 +38,13 @@ test("決定記録の形（見出し・箇条書き・入れ子）を解析す�
 
 test("番号付きリストと箇条書きが続いたら別のリストにする", () => {
   const blocks = parseMarkdown("1. 一\n2. 二\n- 点");
-  assert.deepEqual(blocks.map((b) => b.type === "list" && [b.ordered, b.items.length]), [[true, 2], [false, 1]]);
+  assert.deepEqual(
+    blocks.map((b) => b.type === "list" && [b.ordered, b.items.length]),
+    [
+      [true, 2],
+      [false, 1],
+    ],
+  );
 });
 
 test("項目の後ろの字下げしていない行は、その項目の続きとして扱う", () => {

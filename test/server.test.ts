@@ -6,7 +6,11 @@ import { useTempBoard } from "./temp-board.ts";
 
 useTempBoard("devboard-server");
 const store = await import("../src/store.ts");
-store.updateProject(() => ({ name: "t", summary: "", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
+store.updateProject(() => ({
+  name: "t",
+  summary: "",
+  milestones: [{ id: "M0", title: "m", goal: "", status: "active" }],
+}));
 
 const { startServer } = await import("../src/server.ts");
 const TS = "mac.example.ts.net";
@@ -39,7 +43,10 @@ test("画面からタスクを追加・更新でき、ユーザーの操作と�
   const updated = await upd.json();
   assert.equal(updated.status, "doing");
   assert.equal(updated.priority, "high");
-  assert.deepEqual(updated.notes.map((n: { by: string }) => n.by), ["user"]);
+  assert.deepEqual(
+    updated.notes.map((n: { by: string }) => n.by),
+    ["user"],
+  );
 });
 
 test("不正な入力は 400 で理由を返す", async () => {
@@ -83,9 +90,27 @@ test("tailnet の名前は Host と https の Origin で許可し、それ以外
 
   // tailscale serve が Host を ts.net のまま中継しても、127.0.0.1 に書き換えても通ること
   for (const host of [`${TS}:8448`, new URL(base).host]) {
-    assert.equal(await raw("POST", "/api/tasks", { host, origin: `https://${TS}:8448` }, { title: "スマホから" }), 201, host);
+    assert.equal(
+      await raw("POST", "/api/tasks", { host, origin: `https://${TS}:8448` }, { title: "スマホから" }),
+      201,
+      host,
+    );
   }
-  assert.equal(await raw("POST", "/api/tasks", { host: `${TS}:8448`, origin: `http://${TS}:8448` }, { title: "x" }), 403);
-  assert.equal(await raw("POST", "/api/tasks", { host: `${TS}:8448`, origin: "https://other.example.ts.net" }, { title: "x" }), 403);
-  assert.equal(await raw("POST", "/api/tasks", { host: `${TS}:8448`, origin: `https://${TS}:8448`, "content-type": "text/plain" }, { title: "x" }), 403);
+  assert.equal(
+    await raw("POST", "/api/tasks", { host: `${TS}:8448`, origin: `http://${TS}:8448` }, { title: "x" }),
+    403,
+  );
+  assert.equal(
+    await raw("POST", "/api/tasks", { host: `${TS}:8448`, origin: "https://other.example.ts.net" }, { title: "x" }),
+    403,
+  );
+  assert.equal(
+    await raw(
+      "POST",
+      "/api/tasks",
+      { host: `${TS}:8448`, origin: `https://${TS}:8448`, "content-type": "text/plain" },
+      { title: "x" },
+    ),
+    403,
+  );
 });

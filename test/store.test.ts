@@ -9,7 +9,11 @@ const store = await import("../src/store.ts");
 const { board } = await import("../src/board-db.ts");
 
 before(() => {
-  store.updateProject(() => ({ name: "t", summary: "", milestones: [{ id: "M0", title: "m", goal: "", status: "active" }] }));
+  store.updateProject(() => ({
+    name: "t",
+    summary: "",
+    milestones: [{ id: "M0", title: "m", goal: "", status: "active" }],
+  }));
 });
 
 test("タスクを採番して作成し、更新でメモが積まれる", () => {
@@ -39,11 +43,16 @@ test("決定記録を採番して作成し、状態を変えられる", () => {
   const d = store.createDecision({ title: "決める", slug: "decide-x", context: "c", decision: "d", consequences: "e" });
   assert.equal(d.number, 1);
   assert.equal(d.status, "提案");
-  assert.equal(store.createDecision({ title: "次", slug: "next", context: "c", decision: "d", consequences: "e" }).number, 2);
+  assert.equal(
+    store.createDecision({ title: "次", slug: "next", context: "c", decision: "d", consequences: "e" }).number,
+    2,
+  );
   const s = store.setDecisionStatus(1, "採用");
   assert.equal(s.status, "採用");
   assert.match(readFileSync(join(root, s.file), "utf8"), /- 状態: 採用/);
-  assert.throws(() => store.createDecision({ title: "x", slug: "Bad Slug", context: "", decision: "", consequences: "" }));
+  assert.throws(() =>
+    store.createDecision({ title: "x", slug: "Bad Slug", context: "", decision: "", consequences: "" }),
+  );
 });
 
 test("親子・依存を検証し、次に着手できるタスクを優先度順に返す", () => {

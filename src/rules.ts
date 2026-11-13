@@ -31,18 +31,27 @@ export function ruleProblems(tasks: Task[], milestones: Set<string>): RuleProble
   const problems: RuleProblem[] = [];
   for (const task of tasks) {
     const add = (check: string, message: string) => problems.push({ task: task.id, check, message });
-    if (task.milestone && !milestones.has(task.milestone)) add("broken-link", `マイルストーン ${task.milestone} が無い`);
+    if (task.milestone && !milestones.has(task.milestone))
+      add("broken-link", `マイルストーン ${task.milestone} が無い`);
     if (task.parent && !byId.has(task.parent)) add("broken-link", `親 ${task.parent} が存在しない`);
     for (const dep of task.dependsOn) if (!byId.has(dep)) add("broken-link", `依存先 ${dep} が存在しない`);
-    if (task.dependsOn.includes(task.id) || reaches(task.id, task.dependsOn, (id) => byId.get(id)?.dependsOn ?? [])) add("broken-link", "依存が循環している");
-    if (reaches(task.id, task.parent ? [task.parent] : [], (id) => [byId.get(id)?.parent].filter((p): p is string => Boolean(p)))) {
+    if (task.dependsOn.includes(task.id) || reaches(task.id, task.dependsOn, (id) => byId.get(id)?.dependsOn ?? []))
+      add("broken-link", "依存が循環している");
+    if (
+      reaches(task.id, task.parent ? [task.parent] : [], (id) =>
+        [byId.get(id)?.parent].filter((p): p is string => Boolean(p)),
+      )
+    ) {
       add("broken-link", "親子関係が循環している");
     }
     const needsNote = NEEDS_NOTE[task.status];
     if (needsNote && task.notes.length === 0) add("unexplained-state", needsNote);
-    if (task.status === "review" && task.createdBy === "ai") add("forbidden-review", "AI のタスクは review にしない。結果を自分で確かめて done にする");
+    if (task.status === "review" && task.createdBy === "ai")
+      add("forbidden-review", "AI のタスクは review にしない。結果を自分で確かめて done にする");
     if (task.status === "done") {
-      const open = tasks.filter((child) => child.parent === task.id && OPEN.includes(child.status)).map((child) => child.id);
+      const open = tasks
+        .filter((child) => child.parent === task.id && OPEN.includes(child.status))
+        .map((child) => child.id);
       if (open.length) add("parent-closed-early", `子（${open.join(", ")}）が終わっていないのに done になっている`);
     }
   }

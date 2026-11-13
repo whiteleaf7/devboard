@@ -52,7 +52,10 @@ function today(): string {
 const padded = (prefix: string, n: number) => `${prefix}-${String(n).padStart(3, "0")}`;
 
 // 行の JSON を読む。壊れた行があっても他は読めるよう、例外ではなく結果で返す
-function parseRow<T>(schema: z.ZodType<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {
+function parseRow<T>(
+  schema: z.ZodType<T>,
+  data: unknown,
+): { success: true; data: T } | { success: false; error: string } {
   let json: unknown;
   try {
     json = JSON.parse(String(data));
@@ -60,14 +63,18 @@ function parseRow<T>(schema: z.ZodType<T>, data: unknown): { success: true; data
     return { success: false, error: "JSON として読めない" };
   }
   const parsed = schema.safeParse(json);
-  return parsed.success ? { success: true, data: parsed.data } : { success: false, error: parsed.error.issues[0]?.message ?? "形式が合わない" };
+  return parsed.success
+    ? { success: true, data: parsed.data }
+    : { success: false, error: parsed.error.issues[0]?.message ?? "形式が合わない" };
 }
 
 // ---- プロジェクトとマイルストーン ----
 
 export function readProject(): Project {
   const row = board().prepare("SELECT data FROM project WHERE id = 1").get();
-  return row ? Project.parse(JSON.parse(String(row.data))) : { name: basename(repoRoot()), summary: "", milestones: [] };
+  return row
+    ? Project.parse(JSON.parse(String(row.data)))
+    : { name: basename(repoRoot()), summary: "", milestones: [] };
 }
 
 // ---- タスク ----
@@ -103,7 +110,12 @@ function assertMilestone(milestone: string | null | undefined): void {
 }
 
 // 親と依存先が存在し、自分自身や循環を指していないことを確かめる。決まりの検査より先に、分かりやすい言葉で断る
-function assertLinks(tasks: Task[], id: string, parent: string | null | undefined, dependsOn: string[] | undefined): void {
+function assertLinks(
+  tasks: Task[],
+  id: string,
+  parent: string | null | undefined,
+  dependsOn: string[] | undefined,
+): void {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const exists = (x: string) => {
     if (!byId.has(x)) throw new Error(`タスク ${x} は存在しない`);
@@ -138,7 +150,11 @@ function assertRules(before: Task[], after: Task[], by: Author): void {
 }
 
 function saveTask(task: Task, number: number): void {
-  board().prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data").run(task.id, number, JSON.stringify(task));
+  board()
+    .prepare(
+      "INSERT INTO tasks (id, number, data) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data",
+    )
+    .run(task.id, number, JSON.stringify(task));
 }
 
 export function createTask(input: NewTask): Task {
@@ -181,7 +197,9 @@ export type TaskPatch = z.infer<typeof TaskUpdateInput> & { by?: Author };
 function changesOf(before: Task, after: Task): Record<string, { from: unknown; to: unknown }> {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)].filter((k) => k !== "notes" && k !== "updated"));
   return Object.fromEntries(
-    [...keys].filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k])).map((k) => [k, { from: before[k] ?? null, to: after[k] ?? null }]),
+    [...keys]
+      .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))
+      .map((k) => [k, { from: before[k] ?? null, to: after[k] ?? null }]),
   );
 }
 
@@ -196,12 +214,23 @@ export function updateTask(id: string, patch: TaskPatch): Task {
     const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     const at = now();
     const added = note?.trim() ? { at, text: note.trim(), by } : null;
-    const task = Task.parse({ ...current, ...defined, notes: added ? [...current.notes, added] : current.notes, id: current.id, updated: at });
-    assertRules(tasks, tasks.map((t) => (t.id === id ? task : t)), by);
+    const task = Task.parse({
+      ...current,
+      ...defined,
+      notes: added ? [...current.notes, added] : current.notes,
+      id: current.id,
+      updated: at,
+    });
+    assertRules(
+      tasks,
+      tasks.map((t) => (t.id === id ? task : t)),
+      by,
+    );
     const number = Number(db.prepare("SELECT number FROM tasks WHERE id = ?").get(id)?.number);
     saveTask(task, number);
     const changes = changesOf(current, task);
-    if (Object.keys(changes).length) appendEvent(db, { at, actor: by, kind: "task.changed", subject: id, data: { changes } });
+    if (Object.keys(changes).length)
+      appendEvent(db, { at, actor: by, kind: "task.changed", subject: id, data: { changes } });
     if (added) appendEvent(db, { at, actor: by, kind: "task.noted", subject: id, data: { note: added } });
     return task;
   });
@@ -213,10 +242,20 @@ export function updateProject(change: (project: Project) => Project, by: Author 
     const before = readProject();
     const after = Project.parse(change(structuredClone(before)));
     const { tasks } = readTasks();
-    const used = tasks.flatMap((t) => (t.milestone && !after.milestones.some((m) => m.id === t.milestone) ? [`${t.id}（${t.milestone}）`] : []));
+    const used = tasks.flatMap((t) =>
+      t.milestone && !after.milestones.some((m) => m.id === t.milestone) ? [`${t.id}（${t.milestone}）`] : [],
+    );
     if (used.length) throw new Error(`タスクが使っているマイルストーンは消せない: ${used.join(", ")}`);
-    db.prepare("INSERT INTO project (id, data) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data").run(JSON.stringify(after));
-    appendEvent(db, { at: now(), actor: by, kind: "project.changed", subject: "project", data: { from: before, to: after } });
+    db.prepare("INSERT INTO project (id, data) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data").run(
+      JSON.stringify(after),
+    );
+    appendEvent(db, {
+      at: now(),
+      actor: by,
+      kind: "project.changed",
+      subject: "project",
+      data: { from: before, to: after },
+    });
     return after;
   });
 }
@@ -263,7 +302,11 @@ export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
       tags: input.tags ?? [],
       created: now(),
     });
-    db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(lesson.id, number, JSON.stringify(lesson));
+    db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(
+      lesson.id,
+      number,
+      JSON.stringify(lesson),
+    );
     appendEvent(db, { at: lesson.created, actor: "ai", kind: "lesson.created", subject: lesson.id, data: { lesson } });
     return lesson;
   });
@@ -390,5 +433,12 @@ export function snapshot(): Snapshot {
     errors.push(`project: ${e instanceof Error ? e.message : String(e)}`);
   }
   const { tasks, errors: taskErrors } = readTasks();
-  return { project, tasks, decisions: readDecisions(), git: readGit(), errors: [...errors, ...taskErrors], generatedAt: now() };
+  return {
+    project,
+    tasks,
+    decisions: readDecisions(),
+    git: readGit(),
+    errors: [...errors, ...taskErrors],
+    generatedAt: now(),
+  };
 }

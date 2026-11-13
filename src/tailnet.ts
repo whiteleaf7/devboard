@@ -19,7 +19,11 @@ export function tailnetName(): string | null {
   const cli = tailscaleCli();
   if (!cli) return null;
   try {
-    const out = execFileSync(cli, ["status", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000 });
+    const out = execFileSync(cli, ["status", "--json"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3000,
+    });
     const status = JSON.parse(out) as { BackendState?: string; Self?: { DNSName?: string } };
     if (status.BackendState !== "Running") return null;
     return status.Self?.DNSName?.replace(/\.$/, "") || null;

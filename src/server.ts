@@ -30,7 +30,10 @@ const asset = (name: string) => readFileSync(join(import.meta.dirname, "..", "pu
 const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
 export function remoteHosts(): string[] {
-  const extra = (process.env.NAGAYA_DEV_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+  const extra = (process.env.NAGAYA_DEV_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean);
   const ts = tailnetName();
   return [...new Set([...extra, ...(ts ? [ts] : [])])];
 }
@@ -79,9 +82,16 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-async function handleWrite(req: IncomingMessage, res: ServerResponse, pathname: string, remote: string[]): Promise<void> {
-  if (!writeAllowed(req, remote)) return send(res, 403, "text/plain; charset=utf-8", "この画面以外からの書き込みは受け付けない");
-  const json = (status: number, value: unknown) => send(res, status, "application/json; charset=utf-8", JSON.stringify(value));
+async function handleWrite(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+  remote: string[],
+): Promise<void> {
+  if (!writeAllowed(req, remote))
+    return send(res, 403, "text/plain; charset=utf-8", "この画面以外からの書き込みは受け付けない");
+  const json = (status: number, value: unknown) =>
+    send(res, status, "application/json; charset=utf-8", JSON.stringify(value));
   try {
     const body = await readJson(req);
     if (req.method === "POST" && pathname === "/api/tasks") {
@@ -129,10 +139,12 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
   const watchers: FSWatcher[] = [];
   for (const dir of [paths.decisions(), join(repoRoot(), ".git")]) {
     try {
-      watchers.push(watch(dir, { recursive: true }, (_event, file) => {
-        if (String(file ?? "").endsWith(".tmp")) return;
-        notify();
-      }));
+      watchers.push(
+        watch(dir, { recursive: true }, (_event, file) => {
+          if (String(file ?? "").endsWith(".tmp")) return;
+          notify();
+        }),
+      );
     } catch {
       // ディレクトリがまだ無い場合は監視しない
     }

@@ -18,7 +18,8 @@ export type BoardOp = z.infer<typeof BoardOp>;
 function substitute(value: unknown, ids: string[]): unknown {
   if (typeof value === "string") return value.replace(/^\$(\d+)$/, (whole, n: string) => ids[Number(n)] ?? whole);
   if (Array.isArray(value)) return value.map((v) => substitute(v, ids));
-  if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, substitute(v, ids)]));
+  if (typeof value === "object" && value !== null)
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, substitute(v, ids)]));
   return value;
 }
 

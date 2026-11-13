@@ -11,9 +11,24 @@ before(() => {
 });
 
 const docs: RecallDoc[] = [
-  { id: "D-0004", kind: "decision", title: "UI とデーモンの通信: WebSocket の上に JSON-RPC 2.0", body: "型は zod で共有する。HTTP のポーリングは遅いので選ばなかった。" },
-  { id: "D-0005", kind: "decision", title: "保存: 会話は Claude の記録を読む", body: "nagaya のメタデータは JSON ファイルで持つ。" },
-  { id: "T-021", kind: "task", title: "サーバのアドレスは Tailscale の URL を貼る", body: "ユーザーはスマホなど別の端末から開く。" },
+  {
+    id: "D-0004",
+    kind: "decision",
+    title: "UI とデーモンの通信: WebSocket の上に JSON-RPC 2.0",
+    body: "型は zod で共有する。HTTP のポーリングは遅いので選ばなかった。",
+  },
+  {
+    id: "D-0005",
+    kind: "decision",
+    title: "保存: 会話は Claude の記録を読む",
+    body: "nagaya のメタデータは JSON ファイルで持つ。",
+  },
+  {
+    id: "T-021",
+    kind: "task",
+    title: "サーバのアドレスは Tailscale の URL を貼る",
+    body: "ユーザーはスマホなど別の端末から開く。",
+  },
 ];
 
 test("英数字は単語に、日本語は 2 文字ずつの組に分ける", () => {
@@ -35,7 +50,10 @@ test("タイトルに出る語は、本文に出る語より重く数える", ()
     { id: "T-001", kind: "task", title: "別の話", body: "Tailscale にも触れる。ほかの内容がいくつか続く。" },
     { id: "T-002", kind: "task", title: "Tailscale の URL", body: "ほかの内容がいくつか続く。別の話にも触れる。" },
   ]);
-  assert.deepEqual(hits.map((h) => h.id), ["T-002", "T-001"]);
+  assert.deepEqual(
+    hits.map((h) => h.id),
+    ["T-002", "T-001"],
+  );
 });
 
 test("教訓を採番して残し、タスク・決定記録と一緒に探せる", () => {

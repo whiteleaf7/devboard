@@ -30,7 +30,8 @@ export function lintDecisions(decisions: BoardFile[]): BoardProblem[] {
 
     const status = /^-\s*状態:\s*(.*)$/m.exec(text)?.[1]?.trim();
     if (status === undefined) add("「- 状態:」の行が無い");
-    else if (!(DECISION_STATUSES as readonly string[]).includes(status)) add(`状態「${status}」は使えない（${DECISION_STATUSES.join("・")}）`);
+    else if (!(DECISION_STATUSES as readonly string[]).includes(status))
+      add(`状態「${status}」は使えない（${DECISION_STATUSES.join("・")}）`);
     if (!/^-\s*日付:\s*\d{4}-\d{2}-\d{2}\s*$/m.test(text)) add("「- 日付: YYYY-MM-DD」の行が無い");
     for (const section of ["背景", "決定", "影響"]) {
       if (!new RegExp(`^##\\s*${section}\\s*$`, "m").test(text)) add(`「## ${section}」の見出しが無い`);

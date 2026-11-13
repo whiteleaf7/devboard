@@ -36,7 +36,9 @@ function send(method: string, path: string, headers: Record<string, string> = {}
     const req = request(base + path, { method, headers }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString("utf8") }));
+      res.on("end", () =>
+        resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString("utf8") }),
+      );
     });
     req.on("error", reject);
     req.end(body);
@@ -56,7 +58,10 @@ async function until(condition: () => boolean, timeoutMs = 10_000): Promise<void
 
 test("画面・解析器・API を返し、キャッシュさせない", async () => {
   const page = await send("GET", "/");
-  assert.deepEqual([page.status, page.headers["content-type"], page.headers["cache-control"]], [200, "text/html; charset=utf-8", "no-store"]);
+  assert.deepEqual(
+    [page.status, page.headers["content-type"], page.headers["cache-control"]],
+    [200, "text/html; charset=utf-8", "no-store"],
+  );
   assert.match(page.body, /<html/i);
 
   const script = await send("GET", "/markdown.js");
@@ -85,10 +90,25 @@ test("Host は、ポートと大文字小文字の違いを無視して比べる
 test("書き込みは、同じ Origin からの JSON だけを受け付ける", async () => {
   const body = JSON.stringify({ title: "書き込み" });
   assert.equal((await write("POST", "/api/tasks", body)).status, 201);
-  assert.equal((await write("POST", "/api/tasks", body, { "content-type": "application/json; charset=utf-8" })).status, 201);
-  assert.equal((await write("POST", "/api/tasks", body, { origin: `https://${hostPort}` })).status, 403, "loopback は http だけ");
-  assert.equal((await write("POST", "/api/tasks", body, { origin: `http://localhost:${hostPort.split(":")[1]}` })).status, 403, "Host と違う名前");
-  assert.equal((await write("POST", "/api/tasks", body, { origin: "http://127.0.0.1:1" })).status, 403, "Host と違うポート");
+  assert.equal(
+    (await write("POST", "/api/tasks", body, { "content-type": "application/json; charset=utf-8" })).status,
+    201,
+  );
+  assert.equal(
+    (await write("POST", "/api/tasks", body, { origin: `https://${hostPort}` })).status,
+    403,
+    "loopback は http だけ",
+  );
+  assert.equal(
+    (await write("POST", "/api/tasks", body, { origin: `http://localhost:${hostPort.split(":")[1]}` })).status,
+    403,
+    "Host と違う名前",
+  );
+  assert.equal(
+    (await write("POST", "/api/tasks", body, { origin: "http://127.0.0.1:1" })).status,
+    403,
+    "Host と違うポート",
+  );
   assert.equal((await write("POST", "/api/tasks", body, { origin: "null" })).status, 403);
   assert.equal((await write("POST", "/api/tasks", body, { "content-type": "text/json" })).status, 403);
   const refused = await write("POST", "/api/tasks", body, { origin: "https://evil.example" });
@@ -112,7 +132,11 @@ test("書き込みの経路と本文を確かめ、理由つきで断る", async
   assert.match(JSON.parse((await write("PATCH", "/api/tasks/T-999", "{}")).body).error, /T-999/);
 
   const limit = 1024 * 1024;
-  const sized = (bytes: number) => JSON.stringify({ title: "big", description: "a".repeat(bytes - JSON.stringify({ title: "big", description: "" }).length) });
+  const sized = (bytes: number) =>
+    JSON.stringify({
+      title: "big",
+      description: "a".repeat(bytes - JSON.stringify({ title: "big", description: "" }).length),
+    });
   assert.equal(Buffer.byteLength(sized(limit)), limit);
   assert.equal((await write("POST", "/api/tasks", sized(limit))).status, 201, "上限ちょうどは受け付ける");
   const tooLarge = await write("POST", "/api/tasks", sized(limit + 1));

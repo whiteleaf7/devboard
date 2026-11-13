@@ -50,7 +50,8 @@ export function describeTasks(tasks: Task[]): TaskView[] {
     for (const d of t?.dependsOn ?? []) {
       const dep = byId.get(d);
       if (!dep) reason = `依存先 ${d} が存在しない`;
-      else if (NEEDS_USER.includes(dep.status)) reason = `依存先 ${d} が${dep.status === "review" ? "確認待ち" : "ブロック"}`;
+      else if (NEEDS_USER.includes(dep.status))
+        reason = `依存先 ${d} が${dep.status === "review" ? "確認待ち" : "ブロック"}`;
       else if (!FINISHED.includes(dep.status)) {
         const inner = stuckOf(d, seen);
         if (inner) reason = `${d} 経由: ${inner}`;
@@ -69,7 +70,7 @@ export function describeTasks(tasks: Task[]): TaskView[] {
   while (remaining.size) {
     const available = plannable
       .filter((t) => remaining.has(t.id))
-      .filter((t) => t.dependsOn.every((d) => finished(d) || order.has(d) || (byId.get(d)?.status === "doing")))
+      .filter((t) => t.dependsOn.every((d) => finished(d) || order.has(d) || byId.get(d)?.status === "doing"))
       .sort((x, y) => rank(x.priority) - rank(y.priority) || x.id.localeCompare(y.id));
     const pick = available[0];
     if (!pick) break; // 子を持つ親に依存しているなど、並べられないものは残す
@@ -93,7 +94,9 @@ export function describeTasks(tasks: Task[]): TaskView[] {
       stuck,
       closable: children.length > 0 && !FINISHED.includes(t.status) && children.every(finished),
       order: order.get(t.id) ?? null,
-      overlaps: ACTIVE.includes(t.status) ? doing.filter((d) => d.id !== t.id && pathsOverlap(t.paths, d.paths)).map((d) => d.id) : [],
+      overlaps: ACTIVE.includes(t.status)
+        ? doing.filter((d) => d.id !== t.id && pathsOverlap(t.paths, d.paths)).map((d) => d.id)
+        : [],
     };
   });
 }

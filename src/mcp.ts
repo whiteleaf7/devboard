@@ -45,7 +45,7 @@ const server = new McpServer({ name: "nagaya-dev", version: "0.1.0" }, { instruc
 
 const json = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
-const tool = <T,>(fn: () => T | Promise<T>) =>
+const tool = <T>(fn: () => T | Promise<T>) =>
   Promise.resolve()
     .then(fn)
     .then(json)
@@ -57,15 +57,20 @@ const tool = <T,>(fn: () => T | Promise<T>) =>
 server.registerTool(
   "get_overview",
   {
-    description: "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す",
+    description:
+      "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す",
     annotations: { readOnlyHint: true },
   },
   () =>
     tool(() => {
       const s = snapshot();
-      const count = Object.fromEntries(TaskStatus.options.map((st) => [st, s.tasks.filter((t) => t.status === st).length]));
+      const count = Object.fromEntries(
+        TaskStatus.options.map((st) => [st, s.tasks.filter((t) => t.status === st).length]),
+      );
       const pick = (st: string) =>
-        s.tasks.filter((t) => t.status === st).map((t) => ({ id: t.id, title: t.title, milestone: t.milestone, branch: t.branch }));
+        s.tasks
+          .filter((t) => t.status === st)
+          .map((t) => ({ id: t.id, title: t.title, milestone: t.milestone, branch: t.branch }));
       return {
         project: { name: s.project.name, summary: s.project.summary },
         milestones: s.project.milestones.map((m) => ({
@@ -86,7 +91,9 @@ server.registerTool(
         closable: describeTasks(s.tasks)
           .filter((t) => t.closable)
           .map((t) => ({ id: t.id, title: t.title })),
-        recentDecisions: s.decisions.slice(-5).map(({ number, title, status, date }) => ({ number, title, status, date })),
+        recentDecisions: s.decisions
+          .slice(-5)
+          .map(({ number, title, status, date }) => ({ number, title, status, date })),
         git: s.git,
         errors: s.errors,
         problems: boardProblems(),
@@ -104,7 +111,7 @@ server.registerTool(
       status: z
         .union([TaskStatus, z.array(TaskStatus)])
         .optional()
-        .describe("この状態だけに絞る。複数なら配列（例: [\"todo\", \"doing\"]）"),
+        .describe('この状態だけに絞る。複数なら配列（例: ["todo", "doing"]）'),
       ready: z.boolean().optional().describe("true なら今すぐ着手できるものだけ"),
       milestone: z.string().optional().describe("このマイルストーン ID だけに絞る"),
       label: z.string().optional().describe("このラベルを持つものだけに絞る"),
@@ -143,7 +150,8 @@ server.registerTool(
 server.registerTool(
   "get_task",
   {
-    description: "タスク 1 件の全項目（説明・メモを含む）と、子タスクの一覧、変更の履歴（history: いつ・誰が（user / ai）・何を変えたか）。ユーザーが変えた状態や優先度を戻す前に history を見る",
+    description:
+      "タスク 1 件の全項目（説明・メモを含む）と、子タスクの一覧、変更の履歴（history: いつ・誰が（user / ai）・何を変えたか）。ユーザーが変えた状態や優先度を戻す前に history を見る",
     inputSchema: { id: z.string().describe("例: T-001") },
     annotations: { readOnlyHint: true },
   },
@@ -153,7 +161,12 @@ server.registerTool(
       const children = readTasks()
         .tasks.filter((t) => t.parent === id)
         .map(({ id, title, status }) => ({ id, title, status }));
-      const history = taskHistory(id).map(({ at, actor, kind, data }) => ({ at, by: actor, kind, ...(typeof data === "object" && data !== null ? data : {}) }));
+      const history = taskHistory(id).map(({ at, actor, kind, data }) => ({
+        at,
+        by: actor,
+        kind,
+        ...(typeof data === "object" && data !== null ? data : {}),
+      }));
       return { ...task, children, history: history.filter((e) => e.kind !== "task.noted") };
     }),
 );
@@ -161,7 +174,8 @@ server.registerTool(
 server.registerTool(
   "create_task",
   {
-    description: "タスクを追加する。ID は自動採番（T-001 形式）。大きな依頼は親タスクを作ってから、parent を指定した子タスクに分ける",
+    description:
+      "タスクを追加する。ID は自動採番（T-001 形式）。大きな依頼は親タスクを作ってから、parent を指定した子タスクに分ける",
     inputSchema: TaskCreateInput.shape,
   },
   (input) => tool(() => createTask(input)),
@@ -192,7 +206,8 @@ server.registerTool(
     description: "決定記録（docs/decisions/）の一覧",
     annotations: { readOnlyHint: true },
   },
-  () => tool(() => readDecisions().map(({ number, title, status, date, file }) => ({ number, title, status, date, file }))),
+  () =>
+    tool(() => readDecisions().map(({ number, title, status, date, file }) => ({ number, title, status, date, file }))),
 );
 
 server.registerTool(
@@ -255,7 +270,8 @@ server.registerTool(
     },
     annotations: { readOnlyHint: true },
   },
-  ({ query, limit }) => tool(() => recall(query, buildDocs(readTasks().tasks, readDecisions(), readLessons().lessons), limit ?? 5)),
+  ({ query, limit }) =>
+    tool(() => recall(query, buildDocs(readTasks().tasks, readDecisions(), readLessons().lessons), limit ?? 5)),
 );
 
 server.registerTool(

@@ -32,7 +32,8 @@ export function boardFile(): string {
   // pnpm --filter はパッケージのディレクトリで動くので、相対パスは呼び出したディレクトリ（INIT_CWD）から解決する
   if (process.env.NAGAYA_BOARD) return resolve(process.env.INIT_CWD ?? process.cwd(), process.env.NAGAYA_BOARD);
   // node --test の中から本物のボードに書かないように止める
-  if (process.env.NODE_TEST_CONTEXT) throw new Error("テストでは NAGAYA_BOARD に一時ファイルを指定する（本物のボードに書かないため）");
+  if (process.env.NODE_TEST_CONTEXT)
+    throw new Error("テストでは NAGAYA_BOARD に一時ファイルを指定する（本物のボードに書かないため）");
   const main = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
   return join(homedir(), ".nagaya-dev", "boards", `${basename(main)}.sqlite`);
 }
@@ -87,7 +88,14 @@ export function write<T>(db: DatabaseSync, fn: () => T): T {
 }
 
 export type EventKind = "task.created" | "task.changed" | "task.noted" | "lesson.created" | "project.changed";
-export type BoardEvent = { seq: number; at: string; actor: string | null; kind: EventKind; subject: string; data: unknown };
+export type BoardEvent = {
+  seq: number;
+  at: string;
+  actor: string | null;
+  kind: EventKind;
+  subject: string;
+  data: unknown;
+};
 
 export function appendEvent(db: DatabaseSync, event: Omit<BoardEvent, "seq">): void {
   db.prepare("INSERT INTO events (at, actor, kind, subject, data) VALUES (?, ?, ?, ?, ?)").run(
