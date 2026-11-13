@@ -12,6 +12,7 @@ import {
   DECISION_STATUSES,
   Lesson,
   LessonInput,
+  MilestoneInput,
   Project,
   Task,
   type Author,
@@ -218,6 +219,20 @@ export function updateProject(change: (project: Project) => Project, by: Author 
     appendEvent(db, { at: now(), actor: by, kind: "project.changed", subject: "project", data: { from: before, to: after } });
     return after;
   });
+}
+
+export function setMilestone({ id, title, goal, status }: z.infer<typeof MilestoneInput>, by: Author = "ai"): Project {
+  return updateProject((project) => {
+    const i = project.milestones.findIndex((m) => m.id === id);
+    if (i < 0) {
+      if (!title) throw new Error("新しいマイルストーンには title が必要");
+      project.milestones.push({ id, title, goal: goal ?? "", status: status ?? "planned" });
+    } else {
+      const m = project.milestones[i]!;
+      project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
+    }
+    return project;
+  }, by);
 }
 
 // ---- 教訓 ----

@@ -10,7 +10,6 @@ import {
   TaskUpdateInput,
   nextTasks,
   describeTasks,
-  MILESTONE_STATUSES,
   DECISION_STATUSES,
   snapshot,
   readTasks,
@@ -21,7 +20,8 @@ import {
   readDecisions,
   createDecision,
   setDecisionStatus,
-  updateProject,
+  setMilestone,
+  MilestoneInput,
   LessonInput,
   createLesson,
   readLessons,
@@ -181,28 +181,9 @@ server.registerTool(
   "set_milestone",
   {
     description: "マイルストーンを追加、または既存のものを更新する（ID が一致すれば更新）",
-    inputSchema: {
-      id: z.string().describe("例: M1"),
-      title: z.string().optional(),
-      goal: z.string().optional().describe("完了の条件"),
-      status: z.enum(MILESTONE_STATUSES).optional(),
-    },
+    inputSchema: MilestoneInput.shape,
   },
-  ({ id, title, goal, status }) =>
-    tool(
-      () =>
-        updateProject((project) => {
-          const i = project.milestones.findIndex((m) => m.id === id);
-          if (i < 0) {
-            if (!title) throw new Error("新しいマイルストーンには title が必要");
-            project.milestones.push({ id, title, goal: goal ?? "", status: status ?? "planned" });
-          } else {
-            const m = project.milestones[i]!;
-            project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
-          }
-          return project;
-        }).milestones,
-    ),
+  (input) => tool(() => setMilestone(input).milestones),
 );
 
 server.registerTool(

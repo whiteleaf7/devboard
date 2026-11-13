@@ -58,6 +58,14 @@ export const Project = z.looseObject({
 });
 export type Project = z.infer<typeof Project>;
 
+// マイルストーンの追加・更新の入力。ID が一致すれば更新する
+export const MilestoneInput = z.object({
+  id: z.string().describe("例: M1"),
+  title: z.string().optional(),
+  goal: z.string().optional().describe("完了の条件"),
+  status: z.enum(MILESTONE_STATUSES).optional(),
+});
+
 export type Decision = {
   number: number;
   file: string;
