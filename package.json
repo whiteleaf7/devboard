@@ -8,7 +8,8 @@
     "mcp": "node src/mcp.ts",
     "tailscale": "node src/tailscale.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "import-history": "node src/board-import.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

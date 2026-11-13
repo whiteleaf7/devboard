@@ -29,7 +29,8 @@ const SCHEMA = `
 
 export function boardFile(): string {
   // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
-  if (process.env.NAGAYA_BOARD) return resolve(process.env.NAGAYA_BOARD);
+  // pnpm --filter はパッケージのディレクトリで動くので、相対パスは呼び出したディレクトリ（INIT_CWD）から解決する
+  if (process.env.NAGAYA_BOARD) return resolve(process.env.INIT_CWD ?? process.cwd(), process.env.NAGAYA_BOARD);
   // node --test の中から本物のボードに書かないように止める
   if (process.env.NODE_TEST_CONTEXT) throw new Error("テストでは NAGAYA_BOARD に一時ファイルを指定する（本物のボードに書かないため）");
   const main = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
