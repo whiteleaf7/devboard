@@ -58,7 +58,7 @@ server.registerTool(
   "get_overview",
   {
     description:
-      "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す",
+      "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す。git.uncommittedDecisions は main の worktree に残った未コミットの決定記録（作業者が書いたもの。司令塔が自分のブランチに移して取り込む）",
     annotations: { readOnlyHint: true },
   },
   () =>

@@ -78,6 +78,8 @@ export type Decision = {
 export type GitInfo = {
   branch: string | null;
   dirty: number;
+  // 作業者が書いて報告し、司令塔がまだ取り込んでいない決定記録（0015）。見落とすと main の worktree に取り残される
+  uncommittedDecisions: string[];
   commits: { hash: string; subject: string; date: string }[];
 };
 

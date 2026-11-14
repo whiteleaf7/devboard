@@ -419,9 +419,15 @@ function committedFiles(id: string): string[] {
   return (log ?? "").split("\n").filter(Boolean);
 }
 
+// `git status --porcelain` の 1 行のパス。git() が出力を trim するので、先頭の行は状態の列の空白が欠けている。名前の変更は変更後を取る
+function changedPath(line: string): string {
+  const path = line.replace(/^\s*\S{1,2}\s+/, "");
+  return path.split(" -> ").at(-1) ?? path;
+}
+
 export function readGit(limit = 8): GitInfo {
   const branch = git(["branch", "--show-current"]) || null;
-  const status = git(["status", "--porcelain"]);
+  const status = git(["status", "--porcelain", "--untracked-files=all"]);
   const log = git(["log", `-${limit}`, "--format=%h%x09%cs%x09%s"]);
   const commits = (log ?? "")
     .split("\n")
@@ -430,7 +436,13 @@ export function readGit(limit = 8): GitInfo {
       const [hash = "", date = "", subject = ""] = line.split("\t");
       return { hash, date, subject };
     });
-  return { branch, dirty: status ? status.split("\n").filter(Boolean).length : 0, commits };
+  const changed = (status ?? "").split("\n").filter(Boolean);
+  return {
+    branch,
+    dirty: changed.length,
+    uncommittedDecisions: changed.map(changedPath).filter((file) => file.startsWith("docs/decisions/")),
+    commits,
+  };
 }
 
 export function snapshot(): Snapshot {

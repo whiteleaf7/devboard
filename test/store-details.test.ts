@@ -206,7 +206,11 @@ test("決定記録は今日の日付で作り、ファイル名の番号順に�
 });
 
 test("git の状態（ブランチ、未コミットの件数、最近のコミット）を読む", () => {
-  assert.deepEqual(store.readGit(), { branch: null, dirty: 0, commits: [] }, "git の管理下でなければ空");
+  assert.deepEqual(
+    store.readGit(),
+    { branch: null, dirty: 0, uncommittedDecisions: [], commits: [] },
+    "git の管理下でなければ空",
+  );
   git("init", "-q", "-b", "main");
   git("config", "user.name", "t");
   git("config", "user.email", "t@example.com");
@@ -228,6 +232,29 @@ test("git の状態（ブランチ、未コミットの件数、最近のコミ�
   assert.match(info.commits[0]?.hash ?? "", /^[0-9a-f]{7,}$/);
   assert.match(info.commits[0]?.date ?? "", /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(store.readGit().commits.length, 3);
+});
+
+test("main の worktree に残った未コミットの決定記録を、追加・変更・名前の変更のどれでも挙げる", () => {
+  const decisions = join(root, "docs", "decisions");
+  const at = (name: string) => join(decisions, name);
+  writeFileSync(join(root, ".gitignore"), "board.sqlite*\n");
+  git("add", ".gitignore", "docs");
+  git("commit", "-q", "-m", "docs: track decisions");
+  const committed = () => store.readGit().uncommittedDecisions;
+  assert.deepEqual(committed(), []);
+
+  writeFileSync(at("0001-decide-2.md"), "changed");
+  writeFileSync(at("0099-new.md"), "new");
+  git("mv", at("0012-later.md"), at("0012-renamed.md"));
+  writeFileSync(join(root, "a.txt"), "not a decision");
+  assert.deepEqual(committed().toSorted(), [
+    "docs/decisions/0001-decide-2.md",
+    "docs/decisions/0012-renamed.md",
+    "docs/decisions/0099-new.md",
+  ]);
+  git("reset", "-q", "--hard");
+  git("clean", "-fq", "docs");
+  assert.deepEqual(committed(), [], "取り込んだら挙がらない");
 });
 
 test("paths の無いタスクも、`Task:` の行で指したコミットがコードを変えていれば、動かした証拠なしでは閉じない", () => {
