@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { ruleProblems } from "./rules.ts";
-import { DECISION_STATUSES, paths, readProject, readTasks } from "./store.ts";
+import { DECISION_STATUSES, decisionsDir, readProject, readTasks } from "./store.ts";
 
 export type BoardFile = { file: string; text: string };
 export type BoardProblem = { check: string; file: string; message: string };
@@ -41,7 +41,7 @@ export function lintDecisions(decisions: BoardFile[]): BoardProblem[] {
 }
 
 export function boardProblems(): BoardProblem[] {
-  const dir = paths.decisions();
+  const dir = decisionsDir();
   const decisions = existsSync(dir)
     ? readdirSync(dir)
         .filter((name) => name.endsWith(".md"))

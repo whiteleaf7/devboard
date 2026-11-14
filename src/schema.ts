@@ -83,15 +83,6 @@ export type GitInfo = {
   commits: { hash: string; subject: string; date: string }[];
 };
 
-export type Snapshot = {
-  project: Project;
-  tasks: Task[];
-  decisions: Decision[];
-  git: GitInfo;
-  errors: string[];
-  generatedAt: string;
-};
-
 // タスクの追加・更新の入力。MCP のツールと画面の API で共有する
 export const TaskCreateInput = z.object({
   title: z.string().trim().min(1),

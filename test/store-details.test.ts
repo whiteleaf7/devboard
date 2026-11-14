@@ -280,6 +280,15 @@ test("paths の無いタスクも、`Task:` の行で指したコミットがコ
   );
 });
 
+test("スナップショットのタスクには、画面が並べる順と待ちが付く", () => {
+  const first = store.createTask({ title: "先にやる", priority: "low" });
+  const after = store.createTask({ title: "後でやる", priority: "high", dependsOn: [first.id] });
+  const byId = new Map(store.snapshot().tasks.map((t) => [t.id, t]));
+  const [a, b] = [byId.get(first.id), byId.get(after.id)];
+  assert.ok(a?.order && b?.order && a.order < b.order, "優先度が高くても、依存先より後に並ぶ");
+  assert.deepEqual(b?.waitingOn, [{ id: first.id, status: "todo" }]);
+});
+
 test("スナップショットは、壊れた行があっても残りを返す", () => {
   const snapshot = store.snapshot();
   assert.deepEqual([snapshot.project.name, snapshot.errors.length, snapshot.git.branch], ["t", 0, "main"]);

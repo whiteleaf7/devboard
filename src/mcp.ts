@@ -85,12 +85,8 @@ server.registerTool(
         next: nextTasks(s.tasks)
           .slice(0, 5)
           .map((t) => ({ id: t.id, title: t.title, priority: t.priority, parent: t.parent, milestone: t.milestone })),
-        stuck: describeTasks(s.tasks)
-          .filter((t) => t.stuck)
-          .map((t) => ({ id: t.id, title: t.title, reason: t.stuck })),
-        closable: describeTasks(s.tasks)
-          .filter((t) => t.closable)
-          .map((t) => ({ id: t.id, title: t.title })),
+        stuck: s.tasks.filter((t) => t.stuck).map((t) => ({ id: t.id, title: t.title, reason: t.stuck })),
+        closable: s.tasks.filter((t) => t.closable).map((t) => ({ id: t.id, title: t.title })),
         recentDecisions: s.decisions
           .slice(-5)
           .map(({ number, title, status, date }) => ({ number, title, status, date })),

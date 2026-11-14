@@ -19,7 +19,7 @@ import { z } from "zod";
 import { loadActivity } from "./activity-sources.ts";
 import { board, latestSeq } from "./board-db.ts";
 import { tailnetName } from "./tailnet.ts";
-import { paths, repoRoot, snapshot, createTask, updateTask, TaskCreateInput, TaskUpdateInput } from "./store.ts";
+import { decisionsDir, repoRoot, snapshot, createTask, updateTask, TaskCreateInput, TaskUpdateInput } from "./store.ts";
 
 export const DEFAULT_PORT = 4848;
 const BOARD_POLL_MS = 500;
@@ -152,7 +152,7 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
   }, BOARD_POLL_MS);
 
   const watchers: FSWatcher[] = [];
-  for (const dir of [paths.decisions(), join(repoRoot(), ".git")]) {
+  for (const dir of [decisionsDir(), join(repoRoot(), ".git")]) {
     try {
       watchers.push(
         watch(dir, { recursive: true }, (_event, file) => {

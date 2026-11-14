@@ -249,7 +249,6 @@ const COLUMNS = [
 ];
 const FINISHED = ["done", "cancelled"];
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
-const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
 const LIST_SIZE = { column: { first: 8, step: 20 }, decisions: { first: 5, step: 20 } };
 document.getElementById("open-settings").onclick = () => {
   for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
@@ -340,7 +339,6 @@ function taskLink(id) {
 
 function renderTaskView(task) {
   const milestone = data.project.milestones.find((m) => m.id === task.milestone);
-  const children = data.tasks.filter((t) => t.parent === task.id);
   $("view-id").textContent = task.id;
   $("view-status").replaceChildren(el("span", { className: "status-badge", style: statusColor(task.status), textContent: STATUS_LABEL[task.status] }));
   $("view-priority").replaceChildren(...(task.priority === "normal" ? [] : [el("span", { className: `tag ${task.priority}`, textContent: task.priority === "high" ? "優先" : "低い優先度" })]));
@@ -349,7 +347,7 @@ function renderTaskView(task) {
     ["マイルストーン", task.milestone && [milestone ? `${milestone.id} ${milestone.title}` : task.milestone]],
     ["親タスク", task.parent && [taskLink(task.parent)]],
     ["依存", task.dependsOn.length && task.dependsOn.map(taskLink), "stack"],
-    ["子タスク", children.length && children.map((c) => taskLink(c.id)), "stack"],
+    ["子タスク", task.children.length && task.children.map(taskLink), "stack"],
     ["ラベル", task.labels.length && task.labels.map((l) => el("span", { className: "tag", textContent: l }))],
     ["ブランチ", task.branch && [el("code", { textContent: task.branch })]],
     ["触る範囲", task.paths.length && task.paths.map((p) => el("code", { textContent: p })), "stack"],
@@ -525,8 +523,6 @@ function render() {
     return node;
   }));
 
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  const childCount = (id) => tasks.filter((t) => t.parent === id).length;
   const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
   $("board-title").textContent = filter ? `タスク（${filter} のみ）` : "タスク";
   const inColumnOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
@@ -539,16 +535,15 @@ function render() {
   }));
   $("board").replaceChildren(...COLUMNS.map(([status, label]) => {
     const inColumn = inColumnOf(status);
+    // 未着手は着手する順（order）。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く
     const items = shown.filter(inColumn).sort((a, b) =>
       status === "todo"
-        ? PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.id.localeCompare(b.id)
+        ? (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id)
         : b.updated.localeCompare(a.updated));
     const paged = pagedList(status, LIST_SIZE.column, items);
     const col = el("div", { className: `col${status === mobileStatus ? " current" : ""}`, style: `--c: var(--${status})` },
       el("h3", {}, label, el("span", { className: "n", textContent: items.length })),
       el("div", { className: "cards" }, ...(items.length ? paged.shown.map((t) => {
-        const waiting = t.dependsOn.filter((d) => !FINISHED.includes(byId.get(d)?.status));
-        const kids = childCount(t.id);
         const card = el("div", { className: `card ${t.status}`, tabIndex: 0, draggable: true, role: "button", title: "クリックで詳細、ドラッグで状態を変更" },
           el("div", { className: "id", textContent: t.id }),
           el("div", { className: "title", textContent: t.title }),
@@ -556,8 +551,8 @@ function render() {
             ...(t.status === "cancelled" ? [el("span", { className: "tag", textContent: "中止" })] : []),
             ...(t.priority === "high" ? [el("span", { className: "tag high", textContent: "優先" })] : []),
             ...(t.parent ? [el("span", { className: "tag", textContent: `↳ ${t.parent}` })] : []),
-            ...(kids ? [el("span", { className: "tag", textContent: `子 ${kids}` })] : []),
-            ...(waiting.length ? [el("span", { className: "tag wait", textContent: `待ち ${waiting.join(", ")}` })] : []),
+            ...(t.children.length ? [el("span", { className: "tag", textContent: `子 ${t.children.length}` })] : []),
+            ...(t.waitingOn.length ? [el("span", { className: "tag wait", textContent: `待ち ${t.waitingOn.map((w) => w.id).join(", ")}` })] : []),
             ...(t.milestone ? [el("span", { className: "tag", textContent: t.milestone })] : []),
             ...t.labels.map((l) => el("span", { className: "tag", textContent: l })),
             ...(t.branch ? [el("span", { className: "tag", textContent: t.branch })] : []),
