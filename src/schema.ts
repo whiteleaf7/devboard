@@ -111,7 +111,12 @@ export type NewTask = z.infer<typeof TaskCreateInput> & { createdBy?: Author };
 export const TaskUpdateInput = TaskCreateInput.partial().extend({
   labels: z.array(z.string()).optional().describe("置き換え（追記ではない）"),
   parent: z.string().nullable().optional().describe("分解元の親タスク ID。null で外す"),
-  note: z.string().optional().describe("メモの履歴に追記する。経過・判断・次にやること"),
+  note: z
+    .string()
+    .optional()
+    .describe(
+      "メモの履歴に追記する。経過・判断・次にやること。paths に docs 以外があるタスクを done にするときは「動かした: `コマンド` → 結果」の行を入れる（テストと型チェックだけでは閉じられない）",
+    ),
 });
 
 // 教訓: うまくいかなかったことと、その対処。似た作業の前に recall で引き出して、同じ失敗を繰り返さないために残す

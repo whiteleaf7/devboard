@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { lintDecisions, type BoardFile } from "../src/lint.ts";
-import { introducedProblems, ruleProblems } from "../src/rules.ts";
+import { closingProblems, hasRunEvidence, introducedProblems, ruleProblems } from "../src/rules.ts";
 import { Task } from "../src/schema.ts";
 
 const note = { at: "2026-11-12T00:00:00.000Z", text: "確かめた", by: "ai" };
@@ -65,6 +65,46 @@ test("変更で新しく増えた問題だけを返す", () => {
   assert.deepEqual(
     introducedProblems(before, after).map((p) => [p.task, p.check]),
     [["T-002", "unexplained-state"]],
+  );
+});
+
+test("動かしたコマンドと結果の行だけを、動かした証拠とみなす", () => {
+  const ran = [
+    "動かした: `pnpm --filter @nagaya/verify screenshot http://127.0.0.1:5173/ .dev/verify/a.png --wait-for .card` → 一覧に 3 件出た",
+    "修正した。\n- 動かした：`NAGAYA_BOARD=/tmp/b.sqlite pnpm board:apply '[]'` -> `{\"ids\":[]}`",
+    "動かした: `pnpm test` → 通った\n動かした: `pnpm harness:selftest` → 45/45",
+    "動かした: `node tools/x.ts a->b` → 出力が 2 行",
+  ];
+  for (const text of ran) assert.equal(hasRunEvidence(text), true, text);
+  const notRun = [
+    "テストで確かめた",
+    "pnpm test と pnpm typecheck が通った",
+    "動かした: `pnpm test` → 120 件通った",
+    "動かした: `pnpm --filter @nagaya/devboard typecheck` → エラー無し",
+    "動かした: `node --test test/` → 通った",
+    "動かした: `CI=1 pnpm run lint` → 0 件",
+    "動かした: `pnpm board:apply '[]'`",
+    "動かした: `pnpm board:apply '[]'` → ",
+    "動かした: pnpm board:apply → 通った",
+    "`pnpm board:apply '[]'` → 通った",
+  ];
+  for (const text of notRun) assert.equal(hasRunEvidence(text), false, text);
+});
+
+test("振る舞いを変えるタスクを、動かした証拠なしで done にしたときだけ見つける", () => {
+  const ran = { ...note, text: "動かした: `pnpm board:apply '[]'` → 断られた" };
+  const closing = (fields: Record<string, unknown>, before = task("T-001", { status: "doing", ...fields })) =>
+    closingProblems([before], [task("T-001", { status: "done", ...fields })]).map((p) => p.check);
+  const code = { paths: ["tools/devboard/src/"] };
+  assert.deepEqual(closing({ ...code, notes: [note] }), ["unverified-done"]);
+  assert.deepEqual(closing({ paths: ["docs/", "CLAUDE.md"], notes: [note] }), [], "docs だけ");
+  assert.deepEqual(closing({ notes: [note] }), [], "paths が無い");
+  assert.deepEqual(closing({ ...code, notes: [ran, note] }), [], "前のメモに証拠がある");
+  assert.deepEqual(closing({ ...code, notes: [note] }, task("T-001", { status: "done" })), [], "前から done");
+  assert.deepEqual(
+    closingProblems([], [task("T-001", { status: "done", ...code, notes: [note] })]).length,
+    1,
+    "作るときに done",
   );
 });
 

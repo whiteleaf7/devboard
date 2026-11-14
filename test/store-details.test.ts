@@ -135,6 +135,17 @@ test("AI の書き込みは、ボードの決まりに新しく反するなら�
     "ユーザーは断らない",
   );
 
+  const feature = store.createTask({ title: "振る舞いを変える", paths: ["tools/devboard/src/"] });
+  assert.throws(
+    () => store.updateTask(feature.id, { status: "done", note: "pnpm test と pnpm typecheck が通った" }),
+    /動かした.*docs\/verification\.md/s,
+    "テストだけのメモでは閉じない",
+  );
+  assert.equal(
+    store.updateTask(feature.id, { status: "done", note: "動かした: `pnpm board:apply '[]'` → 断られた" }).status,
+    "done",
+  );
+
   // ユーザーが壊した状態は、AI がほかの項目を変えても断らない（新しく増えた問題だけを止める）
   const reopened = store.updateTask(child.id, { status: "todo", by: "user" });
   assert.equal(store.updateTask(parent.id, { priority: "high" }).priority, "high");

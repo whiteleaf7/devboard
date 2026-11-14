@@ -1,5 +1,6 @@
 // ボードの決まり（CLAUDE.md の「作業するとき」）に合わない状態を探す。
-// store は書く前と後で比べ、新しく増えた問題があれば書かない（決定記録 0011）。get_overview の problems にも使う
+// store は書く前と後で比べ、新しく増えた問題があれば書かない（決定記録 0011）。get_overview の problems にも使う。
+// done にする瞬間だけに見る決まり（closingProblems）は、決まりができる前に閉じたタスクを problems に出さないために分けている
 
 import type { Task } from "./schema.ts";
 
@@ -64,4 +65,70 @@ const key = (p: RuleProblem) => `${p.task}\0${p.check}\0${p.message}`;
 export function introducedProblems(before: RuleProblem[], after: RuleProblem[]): RuleProblem[] {
   const existing = new Set(before.map(key));
   return after.filter((p) => !existing.has(key(p)));
+}
+
+// テストと静的な検査。コードとテストは同じ思い込みで書くので、これらが通っても「書いたとおり」にしかならない
+const CHECK_ONLY = new Set([
+  "test",
+  "typecheck",
+  "lint",
+  "check",
+  "format",
+  "build",
+  "install",
+  "tsc",
+  "vitest",
+  "oxlint",
+  "biome",
+]);
+const OPTION_WITH_VALUE = new Set(["--filter", "-F", "--dir", "-C"]);
+
+function isCheckOnly(command: string): boolean {
+  const words = command.trim().split(/\s+/).filter(Boolean);
+  while (words[0] && /^[A-Za-z_]\w*=/.test(words[0])) words.shift();
+  const [head, ...rest] = words;
+  if (head === "node") return rest[0] === "--test";
+  if (head !== "pnpm" && head !== "bun" && head !== "yarn") return head === undefined || CHECK_ONLY.has(head);
+  let skipValue = false;
+  for (const word of rest) {
+    if (skipValue) skipValue = false;
+    else if (OPTION_WITH_VALUE.has(word)) skipValue = true;
+    else if (!word.startsWith("-") && word !== "run" && word !== "exec") return CHECK_ONLY.has(word);
+  }
+  return true;
+}
+
+// 「動かした: `コマンド` → 結果」の行。テストと静的な検査ではないコマンドと、その結果の両方が要る
+export function hasRunEvidence(text: string): boolean {
+  return [...text.matchAll(/^[\s>*-]*動かした\s*[:：](.*)$/gm)].some(([, line = ""]) => {
+    // コマンドの中の矢印（`a -> b`）で区切らないように、コードの中身を伏せてから探す
+    const arrow = line.replace(/`[^`]*`/g, (code) => "_".repeat(code.length)).search(/→|->/);
+    if (arrow < 0) return false;
+    const result = line
+      .slice(arrow)
+      .replace(/^(→|->)/, "")
+      .trim();
+    const commands = [...line.slice(0, arrow).matchAll(/`([^`]+)`/g)].map(([, command = ""]) => command);
+    return Boolean(result) && commands.some((command) => !isCheckOnly(command));
+  });
+}
+
+// docs だけを変えるタスクは、読めば確かめられる。paths が空のタスクは見分けられないので対象にしない
+const isDocument = (path: string) => path.startsWith("docs/") || path.endsWith(".md");
+export const changesBehavior = (task: Task) => task.paths.some((path) => !isDocument(path));
+
+const UNVERIFIED =
+  "振る舞いを変えるタスク（paths に docs 以外がある）は、実際に動かした結果をメモに残してから done にする。" +
+  "テスト・型チェック・lint・ビルドだけでは足りない。note に「動かした: `コマンド` → 結果」の行を書く" +
+  "（例: 動かした: `pnpm --filter @nagaya/verify screenshot <URL> .dev/verify/board.png --wait-for <セレクタ>` → 一覧に 3 件出た）。" +
+  "手段は docs/verification.md の「使える手段」: 画面は screenshot、ネイティブのウィンドウは windows、" +
+  "CLI やサーバは起動して出力を見る、ボードの操作は NAGAYA_BOARD の写しに pnpm board:apply";
+
+// この変更で done になったタスクのうち、動かした結果の無いもの
+export function closingProblems(before: Task[], after: Task[]): RuleProblem[] {
+  const wasDone = new Set(before.filter((t) => t.status === "done").map((t) => t.id));
+  return after
+    .filter((t) => t.status === "done" && !wasDone.has(t.id) && changesBehavior(t))
+    .filter((t) => !t.notes.some((note) => hasRunEvidence(note.text)))
+    .map((t) => ({ task: t.id, check: "unverified-done", message: UNVERIFIED }));
 }

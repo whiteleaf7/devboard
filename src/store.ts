@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import type { z } from "zod";
 import { appendEvent, board, eventsOf, write, type BoardEvent } from "./board-db.ts";
 import { withLock } from "./lock.ts";
-import { introducedProblems, ruleProblems } from "./rules.ts";
+import { closingProblems, introducedProblems, ruleProblems } from "./rules.ts";
 import {
   DECISION_STATUSES,
   Lesson,
@@ -145,7 +145,10 @@ function assertLinks(
 function assertRules(before: Task[], after: Task[], by: Author): void {
   if (by === "user") return;
   const milestones = new Set(readProject().milestones.map((m) => m.id));
-  const introduced = introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones));
+  const introduced = [
+    ...introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones)),
+    ...closingProblems(before, after),
+  ];
   if (introduced.length) throw new Error(introduced.map((p) => `${p.task}: ${p.message}`).join("\n"));
 }
 
