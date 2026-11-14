@@ -93,12 +93,34 @@ test("動かしたコマンドと結果の行だけを、動かした証拠と�
 
 test("振る舞いを変えるタスクを、動かした証拠なしで done にしたときだけ見つける", () => {
   const ran = { ...note, text: "動かした: `pnpm board:apply '[]'` → 断られた" };
-  const closing = (fields: Record<string, unknown>, before = task("T-001", { status: "doing", ...fields })) =>
-    closingProblems([before], [task("T-001", { status: "done", ...fields })]).map((p) => p.check);
+  const closing = (
+    fields: Record<string, unknown>,
+    before = task("T-001", { status: "doing", ...fields }),
+    committed: string[] = [],
+  ) =>
+    closingProblems([before], [task("T-001", { status: "done", ...fields })], (id) =>
+      id === "T-001" ? committed : [],
+    ).map((p) => p.check);
   const code = { paths: ["tools/devboard/src/"] };
   assert.deepEqual(closing({ ...code, notes: [note] }), ["unverified-done"]);
   assert.deepEqual(closing({ paths: ["docs/", "CLAUDE.md"], notes: [note] }), [], "docs だけ");
-  assert.deepEqual(closing({ notes: [note] }), [], "paths が無い");
+  assert.deepEqual(closing({ notes: [note] }), [], "paths もコミットも無い");
+  const doingNoPaths = task("T-001", { status: "doing" });
+  assert.deepEqual(
+    closing({ notes: [note] }, doingNoPaths, ["tools/devboard/src/rules.ts"]),
+    ["unverified-done"],
+    "paths が無くても、コミットがコードを変えている",
+  );
+  assert.deepEqual(
+    closing({ paths: ["docs/"], notes: [note] }, task("T-001", { status: "doing", paths: ["docs/"] }), ["a.ts"]),
+    ["unverified-done"],
+    "paths は docs だけでも、コミットがコードを変えている",
+  );
+  assert.deepEqual(
+    closing({ notes: [note] }, doingNoPaths, ["docs/harness.md", "README.md"]),
+    [],
+    "コミットも docs だけ",
+  );
   assert.deepEqual(closing({ ...code, notes: [ran, note] }), [], "前のメモに証拠がある");
   assert.deepEqual(closing({ ...code, notes: [note] }, task("T-001", { status: "done" })), [], "前から done");
   assert.deepEqual(

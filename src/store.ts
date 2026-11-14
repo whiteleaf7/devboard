@@ -147,7 +147,7 @@ function assertRules(before: Task[], after: Task[], by: Author): void {
   const milestones = new Set(readProject().milestones.map((m) => m.id));
   const introduced = [
     ...introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones)),
-    ...closingProblems(before, after),
+    ...closingProblems(before, after, committedFiles),
   ];
   if (introduced.length) throw new Error(introduced.map((p) => `${p.task}: ${p.message}`).join("\n"));
 }
@@ -411,6 +411,12 @@ function git(args: string[]): string | null {
   } catch {
     return null;
   }
+}
+
+// `Task:` の行でこのタスクを指したコミットが変えたファイル。取り込む前の worktree のブランチも見るため --all
+function committedFiles(id: string): string[] {
+  const log = git(["log", "--all", "-i", "-E", `--grep=^Task:.*${id}([^0-9]|$)`, "--name-only", "--format="]);
+  return (log ?? "").split("\n").filter(Boolean);
 }
 
 export function readGit(limit = 8): GitInfo {

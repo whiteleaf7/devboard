@@ -230,6 +230,29 @@ test("git の状態（ブランチ、未コミットの件数、最近のコミ�
   assert.equal(store.readGit().commits.length, 3);
 });
 
+test("paths の無いタスクも、`Task:` の行で指したコミットがコードを変えていれば、動かした証拠なしでは閉じない", () => {
+  const commit = (file: string, id: string) => {
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, file), id);
+    git("add", file);
+    git("commit", "-q", "-m", `feat: change ${file}`, "-m", `Task: ${id}`);
+  };
+  const code = store.createTask({ title: "コードを変えたが paths を書かない" });
+  const docs = store.createTask({ title: "README だけを直す" });
+  commit("src/a.ts", code.id);
+  commit("README.md", docs.id);
+  assert.throws(
+    () => store.updateTask(code.id, { status: "done", note: "pnpm test が通った" }),
+    /動かした/,
+    "コミットが変えたファイルで見分ける",
+  );
+  assert.equal(store.updateTask(docs.id, { status: "done", note: "読み直した" }).status, "done");
+  assert.equal(
+    store.updateTask(code.id, { status: "done", note: "動かした: `node src/a.ts` → 何も出ずに終わった" }).status,
+    "done",
+  );
+});
+
 test("スナップショットは、壊れた行があっても残りを返す", () => {
   const snapshot = store.snapshot();
   assert.deepEqual([snapshot.project.name, snapshot.errors.length, snapshot.git.branch], ["t", 0, "main"]);
