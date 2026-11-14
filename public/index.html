@@ -574,10 +574,18 @@ function render() {
   if (viewed) renderTaskView(viewed);
 }
 
+// 活動の画面の図から ?task=T-NNN で来たら、そのタスクを開く
+let requestedTask = new URLSearchParams(location.search).get("task");
+
 async function load() {
   const res = await fetch("/api/snapshot");
   data = await res.json();
   render();
+  if (requestedTask) {
+    showTask(requestedTask);
+    requestedTask = null;
+    history.replaceState(null, "", "/");
+  }
 }
 
 function listen() {

@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { milestoneProgress, summarizeActivity, PR_FIELDS, PullRequest, type Activity } from "./activity.ts";
 import { allEvents, board } from "./board-db.ts";
+import { dependencyGraph, type DependencyGraph } from "./dependency-graph.ts";
 import { readDecisions, readProject, readTasks, repoRoot } from "./store.ts";
 
 const run = promisify(execFile);
@@ -56,6 +57,8 @@ async function readPullRequests(): Promise<PullRequests> {
 
 export type ActivityResponse = Activity & {
   milestones: ReturnType<typeof milestoneProgress>;
+  // マイルストーンの ID ごとの依存関係の図
+  dependencies: Record<string, DependencyGraph>;
   sources: { pullRequests: string | null };
 };
 
@@ -72,9 +75,12 @@ export async function loadActivity(days: number, now = new Date()): Promise<Acti
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     days,
   });
+  const { milestones } = readProject();
+  const { tasks } = readTasks();
   return {
     ...activity,
-    milestones: milestoneProgress(readProject().milestones, readTasks().tasks),
+    milestones: milestoneProgress(milestones, tasks),
+    dependencies: Object.fromEntries(milestones.map((m) => [m.id, dependencyGraph(tasks, m.id)])),
     sources: { pullRequests: prs.error },
   };
 }

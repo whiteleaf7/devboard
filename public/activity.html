@@ -82,6 +82,27 @@
   .check-failure { --c: var(--blocked); }
   .check-pending { --c: #c98500; }
 
+  .graph-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--sub); font-size: 12px; margin-bottom: 12px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .key::before { content: ""; width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--line); border-left: 3px solid var(--c); background: var(--panel); }
+  .legend .key.external::before { border: 1px dashed var(--sub); }
+  .legend .key.bottleneck::before { display: none; }
+  .show-finished { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); font-size: 12px; margin-bottom: 12px; cursor: pointer; }
+  .graph-scroll { overflow-x: auto; }
+  .graph { position: relative; margin: 0 auto; }
+  .graph svg { position: absolute; inset: 0; overflow: visible; }
+  .graph path { fill: none; stroke: var(--axis); stroke-width: 1.5; transition: opacity 0.15s; }
+  .graph marker path { fill: var(--axis); stroke: none; }
+  .graph .node { position: absolute; display: block; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: var(--radius); padding: 6px 8px; color: var(--ink); text-decoration: none; font-size: 12px; transition: opacity 0.15s; }
+  .graph .node.external { border-style: dashed; border-left-style: solid; background: var(--bg); }
+  .graph .node.finished { color: var(--sub); }
+  .graph .node .id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--sub); }
+  .graph .node .title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+  .graph .node:hover, .graph .node:focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
+  .graph.focus .node:not(.lit), .graph.focus path:not(.lit) { opacity: 0.2; }
+  .graph.focus path.lit { stroke: var(--series); }
+
   details.table { margin-top: 12px; font-size: 12px; }
   details.table summary { color: var(--sub); cursor: pointer; }
   details.table table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
@@ -120,6 +141,18 @@
     <p class="caption">いまのタスクの状態。期間には関係しない</p>
     <div class="table-scroll" id="milestones"></div>
   </section>
+  <section class="card">
+    <div class="graph-head">
+      <div>
+        <h3>依存関係</h3>
+        <p class="caption" id="graph-caption"></p>
+      </div>
+      <div class="seg" id="graph-milestone" role="group" aria-label="図に出すマイルストーン"></div>
+    </div>
+    <div class="legend" id="graph-legend"></div>
+    <label class="show-finished"><input type="checkbox" id="graph-finished"> 終わったまとまりも出す</label>
+    <div class="graph-scroll"><div class="graph" id="graph"></div></div>
+  </section>
   <div class="controls">
     <div class="seg" id="days" role="group" aria-label="期間"></div>
     <div class="seg" id="metric" role="group" aria-label="グラフに出す数"></div>
@@ -157,6 +190,7 @@ const SVG = "http://www.w3.org/2000/svg";
 const params = new URLSearchParams(location.search);
 let days = DAYS.some(([d]) => String(d) === params.get("days")) ? Number(params.get("days")) : 30;
 let metric = METRICS.some(([m]) => m === params.get("metric")) ? params.get("metric") : "commits";
+let graphMilestone = params.get("graph");
 let data = null;
 
 const $ = (id) => document.getElementById(id);
@@ -198,7 +232,7 @@ function renderControls() {
 }
 
 function saveState() {
-  history.replaceState(null, "", `?days=${days}&metric=${metric}`);
+  history.replaceState(null, "", `?days=${days}&metric=${metric}${graphMilestone ? `&graph=${graphMilestone}` : ""}`);
   renderControls();
 }
 
@@ -379,6 +413,130 @@ function renderMilestones() {
     el("tfoot", {}, cells(total, [total.title]))));
 }
 
+// ---- 依存関係の図 ----
+
+const STATUS = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
+const statusColor = (status) => `var(--${status === "cancelled" ? "todo" : status})`;
+// 後ろにこれだけ続くタスクに印を付ける
+const BOTTLENECK = 3;
+const NODE = { w: 200, h: 50, gapX: 20, gapY: 36, gapComponent: 48 };
+const isFinished = (n) => n.status === "done" || n.status === "cancelled";
+
+function pickGraphMilestone() {
+  const graphs = data.dependencies;
+  if (graphs[graphMilestone]) return graphMilestone;
+  const withNodes = data.milestones.rows.filter((m) => m.id && graphs[m.id]?.nodes.length);
+  return (withNodes.find((m) => m.status === "active") ?? withNodes[0])?.id ?? null;
+}
+
+function related(graph, id) {
+  const lit = new Set([id]);
+  // 前（依存先）と後ろ（待っているもの）を、それぞれたどる
+  for (const [from, to] of [["to", "from"], ["from", "to"]]) {
+    const queue = [id];
+    while (queue.length) {
+      const current = queue.shift();
+      for (const e of graph.edges) {
+        if (e[from] === current && !lit.has(e[to])) { lit.add(e[to]); queue.push(e[to]); }
+      }
+    }
+  }
+  return lit;
+}
+
+function renderGraph() {
+  const milestone = pickGraphMilestone();
+  segment($("graph-milestone"), data.milestones.rows.filter((m) => m.id && data.dependencies[m.id]?.nodes.length).map((m) => [m.id, m.id]), milestone,
+    (m) => { graphMilestone = m; saveState(); renderGraph(); });
+  const all = milestone ? data.dependencies[milestone] : { nodes: [], edges: [], unlinked: 0 };
+  // まとまりの中の自分のマイルストーンのタスクがすべて終わっていれば、そのまとまりは終わったとみなす
+  const finishedComponents = new Set(all.nodes.map((n) => n.component)
+    .filter((c) => all.nodes.every((n) => n.component !== c || n.external || isFinished(n))));
+  const showFinished = $("graph-finished").checked;
+  const nodes = all.nodes.filter((n) => showFinished || !finishedComponents.has(n.component));
+  const shownIds = new Set(nodes.map((n) => n.id));
+  const graph = { nodes, edges: all.edges.filter((e) => shownIds.has(e.from) && shownIds.has(e.to)) };
+  const hiddenNote = !showFinished && finishedComponents.size ? `。終わったまとまり ${finishedComponents.size} 個を隠している` : "";
+  $("graph-caption").textContent = all.nodes.length
+    ? `矢印は「元が終わると先に着手できる」。押すとボードでタスクを開く。依存のつながりが無いタスク ${all.unlinked} 件は省いた${hiddenNote}`
+    : "依存のつながりがあるタスクは無い";
+
+  const mine = all.nodes.filter((n) => !n.external);
+  $("graph-legend").replaceChildren(
+    ...Object.entries(STATUS).filter(([s]) => s !== "cancelled").map(([s, label]) => {
+      const count = mine.filter((n) => (s === "done" ? ["done", "cancelled"] : [s]).includes(n.status)).length;
+      return el("span", { className: "key", style: `--c: ${statusColor(s)}`, textContent: `${s === "done" ? "完了・中止" : label} ${count}` });
+    }),
+    el("span", { className: "key external", textContent: "ほかのマイルストーン" }),
+    el("span", { className: "key bottleneck", textContent: `◆ 終わっておらず、後ろに ${BOTTLENECK} 件以上続く` }),
+  );
+
+  // まとまりを左から順に並べ、まとまりの中では段ごとに中央にそろえる
+  const rowWidth = (count) => count * NODE.w + Math.max(0, count - 1) * NODE.gapX;
+  const pos = new Map();
+  let left = 0;
+  for (const component of new Set(graph.nodes.map((n) => n.component))) {
+    const members = graph.nodes.filter((n) => n.component === component);
+    const perLayer = new Map();
+    for (const n of members) perLayer.set(n.layer, (perLayer.get(n.layer) ?? 0) + 1);
+    const width = rowWidth(Math.max(...perLayer.values()));
+    for (const n of members) {
+      const offset = (width - rowWidth(perLayer.get(n.layer))) / 2;
+      pos.set(n.id, { x: left + offset + n.order * (NODE.w + NODE.gapX), y: n.layer * (NODE.h + NODE.gapY) });
+    }
+    left += width + NODE.gapComponent;
+  }
+  const width = Math.max(0, left - NODE.gapComponent);
+  const layerCount = graph.nodes.length ? Math.max(...graph.nodes.map((n) => n.layer)) + 1 : 0;
+  const height = layerCount * NODE.h + Math.max(0, layerCount - 1) * NODE.gapY;
+
+  const container = $("graph");
+  container.style.width = `${width}px`;
+  container.style.height = `${height}px`;
+  const svg = svgEl("svg", { width, height, "aria-hidden": "true" });
+  const marker = svgEl("marker", { id: "arrow", viewBox: "0 0 8 8", refX: 8, refY: 4, markerWidth: 7, markerHeight: 7, orient: "auto" });
+  marker.append(svgEl("path", { d: "M0,0 L8,4 L0,8 Z" }));
+  const defs = svgEl("defs");
+  defs.append(marker);
+  svg.append(defs);
+  const edgeNodes = graph.edges.map((e) => {
+    const a = pos.get(e.from), b = pos.get(e.to);
+    const x1 = a.x + NODE.w / 2, y1 = a.y + NODE.h, x2 = b.x + NODE.w / 2, y2 = b.y;
+    const mid = (y2 - y1) / 2;
+    const path = svgEl("path", { d: `M${x1},${y1} C${x1},${y1 + mid} ${x2},${y2 - mid} ${x2},${y2}`, "marker-end": "url(#arrow)" });
+    svg.append(path);
+    return [e, path];
+  });
+
+  const focus = (id) => {
+    const lit = related(graph, id);
+    container.classList.add("focus");
+    for (const node of container.querySelectorAll(".node")) node.classList.toggle("lit", lit.has(node.dataset.id));
+    for (const [e, path] of edgeNodes) path.classList.toggle("lit", lit.has(e.from) && lit.has(e.to));
+  };
+  const unfocus = () => container.classList.remove("focus");
+
+  container.replaceChildren(svg, ...graph.nodes.map((n) => {
+    const { x, y } = pos.get(n.id);
+    const finished = isFinished(n);
+    const link = el("a", {
+      className: `node${n.external ? " external" : ""}${finished ? " finished" : ""}`,
+      href: `/?task=${n.id}`,
+      dataset: { id: n.id },
+      style: `left: ${x}px; top: ${y}px; width: ${NODE.w}px; height: ${NODE.h}px; --c: ${statusColor(n.status)}`,
+    },
+      el("span", { className: "id", textContent: `${!finished && n.downstream >= BOTTLENECK ? "◆ " : ""}${n.id}${n.external ? ` · ${n.milestone ?? "なし"}` : ""}` }),
+      el("span", { className: "title", textContent: n.title }));
+    const detail = `${STATUS[n.status] ?? n.status}${n.downstream ? ` · 後ろに ${n.downstream} 件` : ""} · ${n.title}`;
+    withTip(link, n.id, detail);
+    link.addEventListener("pointerenter", () => focus(n.id));
+    link.addEventListener("focus", () => focus(n.id));
+    link.addEventListener("pointerleave", unfocus);
+    link.addEventListener("blur", unfocus);
+    return link;
+  }));
+}
+
 // ---- PR の履歴 ----
 
 const PR_STATE = { MERGED: ["マージ", "merged"], OPEN: ["オープン", "open"], CLOSED: ["クローズ", "closed"] };
@@ -425,6 +583,7 @@ function render() {
   $("errors").textContent = data.sources.pullRequests ?? "";
   renderSummary();
   renderMilestones();
+  renderGraph();
   renderTiles();
   renderDaily();
   renderHeatmap();
@@ -456,6 +615,8 @@ function listen() {
   es.addEventListener("change", load);
   es.onerror = () => $("live").classList.remove("on");
 }
+
+$("graph-finished").onchange = renderGraph;
 
 let resizeTimer;
 addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 100); });
