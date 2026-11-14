@@ -1,7 +1,7 @@
 // 開発ダッシュボードの HTTP サーバ。127.0.0.1 のみで待ち受ける。
 //   GET /               ボードの画面（public/index.html）
 //   GET /activity       活動の画面（public/activity.html）
-//   GET /base.css, /theme.js, /markdown.js  画面が共有するスタイル・テーマ・Markdown の解析器（public/）
+//   GET /base.css, /theme.js, /markdown.js, /paging.js  画面が共有するスタイル・テーマ・Markdown の解析器・一覧の省略（public/）
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
@@ -179,6 +179,7 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
         return send(res, 200, "text/css; charset=utf-8", asset("base.css"));
       case "/theme.js":
       case "/markdown.js":
+      case "/paging.js":
         return send(res, 200, "text/javascript; charset=utf-8", asset(url.pathname.slice(1)));
       case "/api/activity":
         return void handleActivity(res, url);

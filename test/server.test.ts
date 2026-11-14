@@ -116,7 +116,7 @@ test("tailnet の名前は Host と https の Origin で許可し、それ以外
 });
 
 test("活動の画面と集計を返し、期間の指定が不正なら 400 で理由を返す", async () => {
-  for (const path of ["/activity", "/base.css", "/theme.js"])
+  for (const path of ["/activity", "/base.css", "/theme.js", "/paging.js"])
     assert.equal((await fetch(base + path)).status, 200, path);
 
   await call("PATCH", "/api/tasks/T-001", { status: "done", note: "終えた" });

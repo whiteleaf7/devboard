@@ -41,6 +41,9 @@
   .decisions .title { flex: 1; }
   .decisions .date { color: var(--sub); font-size: 12px; }
 
+  .pager { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+  .pager button { font-size: 12px; color: var(--sub); white-space: nowrap; }
+
   .commits { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 
   dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); width: min(720px, 92vw); max-height: 84vh; padding: 20px 24px; }
@@ -168,6 +171,7 @@
   <section>
     <h2>決定記録</h2>
     <div class="decisions" id="decisions"></div>
+    <div id="decisions-pager"></div>
   </section>
   <section>
     <h2>最近のコミット</h2>
@@ -238,6 +242,7 @@
 </dialog>
 <script type="module">
 import { parseMarkdown } from "./markdown.js";
+import { nextLimit, page } from "./paging.js";
 
 const COLUMNS = [
   ["todo", "未着手"], ["doing", "作業中"], ["review", "確認待ち"], ["blocked", "ブロック"], ["done", "完了・中止"],
@@ -245,6 +250,7 @@ const COLUMNS = [
 const FINISHED = ["done", "cancelled"];
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
 const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+const LIST_SIZE = { column: { first: 8, step: 20 }, decisions: { first: 5, step: 20 } };
 document.getElementById("open-settings").onclick = () => {
   for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
   document.getElementById("settings").showModal();
@@ -256,6 +262,7 @@ for (const r of document.querySelectorAll('#settings input[name="theme"]')) {
 let data = null;
 let filter = null; // 選択中のマイルストーン ID
 let mobileStatus = "todo"; // スマホで表示している列
+const limits = new Map(); // 一覧（列の状態か "decisions"）ごとに開いた件数。変更の通知で描き直しても保つ
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
@@ -470,6 +477,20 @@ for (const dialog of document.querySelectorAll("dialog")) {
   });
 }
 
+function pagedList(key, size, items) {
+  return page(items, limits.get(key) ?? size.first);
+}
+
+// 省略した一覧の下に置く「さらに表示」と「たたむ」
+function pager(key, size, { shown, rest }) {
+  const button = (label, onclick) => el("button", { type: "button", className: "secondary", textContent: label, onclick });
+  const buttons = [
+    ...(rest ? [button(`さらに表示（残り ${rest} 件）`, () => { limits.set(key, nextLimit(shown.length, size.step, shown.length + rest)); render(); })] : []),
+    ...(shown.length > size.first ? [button("たたむ", () => { limits.delete(key); render(); })] : []),
+  ];
+  return buttons.length ? [el("div", { className: "pager" }, ...buttons)] : [];
+}
+
 let dragged = null; // ドラッグ中のタスク ID
 
 async function moveTask(id, status) {
@@ -522,9 +543,10 @@ function render() {
       status === "todo"
         ? PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.id.localeCompare(b.id)
         : b.updated.localeCompare(a.updated));
+    const paged = pagedList(status, LIST_SIZE.column, items);
     const col = el("div", { className: `col${status === mobileStatus ? " current" : ""}`, style: `--c: var(--${status})` },
       el("h3", {}, label, el("span", { className: "n", textContent: items.length })),
-      el("div", { className: "cards" }, ...(items.length ? items.map((t) => {
+      el("div", { className: "cards" }, ...(items.length ? paged.shown.map((t) => {
         const waiting = t.dependsOn.filter((d) => !FINISHED.includes(byId.get(d)?.status));
         const kids = childCount(t.id);
         const card = el("div", { className: `card ${t.status}`, tabIndex: 0, draggable: true, role: "button", title: "クリックで詳細、ドラッグで状態を変更" },
@@ -547,6 +569,7 @@ function render() {
         card.ondragend = () => { dragged = null; card.classList.remove("dragging"); };
         return card;
       }) : [el("div", { className: "empty", textContent: "なし" })])),
+      ...pager(status, LIST_SIZE.column, paged),
     );
     col.addEventListener("dragover", (e) => { if (dragged) { e.preventDefault(); col.classList.add("drop"); } });
     col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
@@ -554,7 +577,8 @@ function render() {
     return col;
   }));
 
-  $("decisions").replaceChildren(...(decisions.length ? decisions.slice().reverse().map((d) => {
+  const pagedDecisions = pagedList("decisions", LIST_SIZE.decisions, decisions.slice().reverse());
+  $("decisions").replaceChildren(...(decisions.length ? pagedDecisions.shown.map((d) => {
     const row = el("button", { type: "button" },
       el("span", { className: "num", textContent: String(d.number).padStart(4, "0") }),
       el("span", { className: "title", textContent: d.title }),
@@ -564,6 +588,7 @@ function render() {
     row.onclick = () => openDetail(d.title, d.body);
     return row;
   }) : [el("div", { className: "empty", style: "padding: 8px 12px", textContent: "なし" })]));
+  $("decisions-pager").replaceChildren(...pager("decisions", LIST_SIZE.decisions, pagedDecisions));
 
   $("commits").replaceChildren(...(git.commits.length
     ? git.commits.map((c) => el("li", { textContent: `${c.hash} ${c.date} ${c.subject}` }))
