@@ -14,6 +14,15 @@ const TITLE_WEIGHT = 3;
 // ひらがなだけの組（助詞や活用）は、内容を表さないので軽くする
 const KANA_ONLY_WEIGHT = 0.3;
 
+// held-out のシナリオを触ったタスクの説明・メモと、それに結び付いた教訓の本文は返さない。
+// ハーネスを改善する側が recall で中身を目にすると、最終評価が意味を失うため（docs/harness.md）
+const HELDOUT_PATH = "tools/harness/eval/heldout/";
+const SEALED_BODY = "held-out のシナリオを触った記録。中身は recall では返さない";
+
+function touchesHeldout(task: Task): boolean {
+  return task.paths.some((path) => `${path.replace(/^\.\//, "")}/`.startsWith(HELDOUT_PATH));
+}
+
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
   for (const run of text
@@ -29,13 +38,16 @@ export function tokenize(text: string): string[] {
 }
 
 export function buildDocs(tasks: Task[], decisions: Decision[], lessons: Lesson[]): RecallDoc[] {
+  const sealed = new Set(tasks.filter(touchesHeldout).map((t) => t.id));
   return [
     ...tasks.map(
       (t): RecallDoc => ({
         id: t.id,
         kind: "task",
         title: t.title,
-        body: [t.description, ...t.notes.map((n) => n.text), t.labels.join(" ")].join("\n"),
+        body: sealed.has(t.id)
+          ? SEALED_BODY
+          : [t.description, ...t.notes.map((n) => n.text), t.labels.join(" ")].join("\n"),
       }),
     ),
     ...decisions.map(
@@ -51,7 +63,7 @@ export function buildDocs(tasks: Task[], decisions: Decision[], lessons: Lesson[
         id: l.id,
         kind: "lesson",
         title: l.title,
-        body: [l.problem, l.cause, l.fix, l.tags.join(" ")].join("\n"),
+        body: l.task && sealed.has(l.task) ? SEALED_BODY : [l.problem, l.cause, l.fix, l.tags.join(" ")].join("\n"),
       }),
     ),
   ];

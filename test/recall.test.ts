@@ -74,3 +74,23 @@ test("教訓を採番して残し、タスク・決定記録と一緒に探せ�
   const found = recall("複製で pnpm install が走ってしまう", buildDocs(store.readTasks().tasks, [], lessons));
   assert.deepEqual([found[0]?.id, found[0]?.kind], ["L-001", "lesson"]);
 });
+
+test("held-out を触ったタスクと、それに結び付いた教訓は、タイトルだけで中身を返さない", () => {
+  const heldout = store.createTask({
+    title: "held-out のシナリオを足す",
+    description: "秘密の目印の行を説明に書いた",
+    paths: ["tools/harness/eval/heldout/"],
+  });
+  store.updateTask(heldout.id, { note: "秘密の目印の行をメモに書いた" });
+  store.createLesson({ title: "held-out の教訓", problem: "秘密の目印の行を教訓に書いた", fix: "f", task: heldout.id });
+  const open = store.createTask({ title: "公開のシナリオを足す", paths: ["tools/harness/eval/public/"] });
+  store.updateTask(open.id, { note: "目印の行を公開のメモに書いた" });
+
+  const docs = buildDocs(store.readTasks().tasks, [], store.readLessons().lessons);
+  const hits = recall("held-out の目印の行", docs, 20);
+  const sealed = hits.filter((h) => h.title.startsWith("held-out"));
+  assert.equal(sealed.length, 2, "タイトルでは引ける");
+  for (const hit of sealed) assert.match(hit.excerpt, /held-out のシナリオを触った記録/);
+  assert.equal(recall("秘密", docs).length, 0, "説明・メモ・教訓の本文では引けない");
+  assert.match(hits.find((h) => h.id === open.id)?.excerpt ?? "", /公開のメモ/);
+});
