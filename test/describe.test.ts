@@ -56,6 +56,17 @@ test("確認待ちやブロックに依存するものは、たどった先ま�
   assert.equal(by.get("T-005")!.stuck, null);
 });
 
+test("依存が循環していても、たどるのを止めて返す", () => {
+  const view = describeTasks([t("T-001", { dependsOn: ["T-002"] }), t("T-002", { dependsOn: ["T-001"] })]);
+  assert.deepEqual(
+    view.map((v) => [v.id, v.stuck]),
+    [
+      ["T-001", null],
+      ["T-002", null],
+    ],
+  );
+});
+
 test("子を持つ親は着手対象にせず、子がすべて終われば closable にする", () => {
   const view = describeTasks([
     t("T-001"),
@@ -71,7 +82,7 @@ test("子を持つ親は着手対象にせず、子がすべて終われば clos
 test("触る範囲が、進行中のタスクと重なるかを返す", () => {
   const view = describeTasks([
     t("T-001", { status: "doing", paths: ["tools/devboard/"] }),
-    t("T-002", { status: "doing", paths: ["docs/harness.md"] }),
+    t("T-002", { status: "doing", paths: ["docs/harness.md", "tools/verify/"] }),
     t("T-003", { paths: ["tools/devboard/src/store.ts"] }),
     t("T-004", { paths: ["tools/dev"] }),
     t("T-005", { paths: ["tools/harness/", "docs/"] }),

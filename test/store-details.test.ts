@@ -91,7 +91,7 @@ test("更新は渡した項目だけを変え、メモは前後の空白を落�
   assert.deepEqual(again.labels, []);
   assert.equal(store.updateTask(task.id, { note: "続き" }).notes.at(-1)?.by, "ai", "書いた人の既定は ai");
   assert.equal(store.updateTask(task.id, { milestone: null, parent: null }).milestone, null);
-  assert.throws(() => store.updateTask(task.id, { milestone: "M9" }), /M9/);
+  assert.throws(() => store.updateTask(task.id, { milestone: "M9", by: "user" }), /マイルストーン M9 はボードにない/);
   assert.throws(() => store.updateTask(task.id, { dependsOn: [task.id] }), /循環/);
   assert.throws(() => store.updateTask(task.id, { parent: task.id }), /循環/);
   assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"] }), /T-999/);
@@ -324,4 +324,16 @@ test("知らない項目は、更新しても消さない（新しい版のコ�
   store.updateProject((p) => p);
   const saved = rawRow("project", 1);
   assert.deepEqual([saved.owner, saved.milestones[0].color], ["me", "red"]);
+});
+
+test("マイルストーンは、ID が無ければ足し、あれば渡した項目だけを変える", () => {
+  const before = store.readProject().milestones.length;
+  assert.throws(() => store.setMilestone({ id: "M8" }), /title が必要/);
+  store.setMilestone({ id: "M8", title: "足した" });
+  const first = store.readProject().milestones[0]!;
+  store.setMilestone({ id: first.id, status: "done" });
+  const milestones = store.readProject().milestones;
+  assert.equal(milestones.length, before + 1);
+  assert.deepEqual(milestones[0], { ...first, status: "done" });
+  assert.deepEqual(milestones.at(-1), { id: "M8", title: "足した", goal: "", status: "planned" });
 });

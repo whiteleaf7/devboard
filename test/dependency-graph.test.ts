@@ -69,3 +69,24 @@ test("つながったまとまりごとに番号を振り、段の中の並び�
     ],
   );
 });
+
+test("1 つのまとまりの段の中は、依存先の並びの平均の順にし、同じなら ID の順にする", () => {
+  // edges に現れる順（T-2 が先）と、ID の順（T-1 が先）を違えておく
+  const g = dependencyGraph([t("T-3", ["T-2"]), t("T-4", ["T-1"]), t("T-5", ["T-1", "T-2"]), t("T-1"), t("T-2")], "M1");
+  assert.deepEqual(
+    g.nodes.map((n) => [n.id, n.layer, n.order]),
+    [
+      ["T-1", 0, 0],
+      ["T-2", 0, 1],
+      ["T-4", 1, 0],
+      ["T-5", 1, 1],
+      ["T-3", 1, 2],
+    ],
+  );
+});
+
+test("まとまりの番号は、ID を数として比べた順に振る", () => {
+  const g = dependencyGraph([t("T-9"), t("T-10"), t("T-11", ["T-10"]), t("T-12", ["T-9"])], "M1");
+  const component = Object.fromEntries(g.nodes.map((n) => [n.id, n.component]));
+  assert.deepEqual(component, { "T-9": 0, "T-12": 0, "T-10": 1, "T-11": 1 });
+});

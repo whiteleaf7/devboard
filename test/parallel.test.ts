@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +41,13 @@ test("linked worktree の中からでも、main の worktree をボードの根�
   const plain = mkdtempSync(join(tmpdir(), "nagaya-plain-"));
   t.after(() => rmSync(plain, { recursive: true, force: true }));
   assert.equal(mainWorktreeOf(plain), plain, "git の管理下でなければ、そのまま");
+
+  // submodule の .git も gitdir を指すファイルだが、指す先に commondir が無い
+  const submodule = join(plain, "sub");
+  mkdirSync(join(plain, "modules", "sub"), { recursive: true });
+  mkdirSync(submodule);
+  writeFileSync(join(submodule, ".git"), "gitdir: ../modules/sub\n");
+  assert.equal(mainWorktreeOf(submodule), submodule, "submodule は、それ自体を根にする");
 });
 
 test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えず、イベントがそろう", async (t) => {

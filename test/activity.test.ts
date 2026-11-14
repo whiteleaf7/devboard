@@ -100,12 +100,13 @@ test("完了したタスクは、done になった変更と、done で作られ�
       { at, subject: "T-001", actor: "user", kind: "task.created", data: { task: { status: "todo" } } },
       { at, subject: "T-001", actor: "user", kind: "task.noted", data: { note: { text: "x" } } },
       { at, subject: "T-001", actor: "ai", kind: "lesson.created", data: {} },
+      { at, subject: "T-002", actor: "ai", kind: "task.noted", data: { note: { text: "y" } } },
     ],
   });
   assert.equal(a.totals.tasksDone, 2);
   assert.equal(a.totals.lessons, 1);
   assert.equal(a.totals.userActions, 2);
-  assert.equal(a.totals.aiActions, 3);
+  assert.equal(a.totals.aiActions, 4);
 });
 
 test("記録が無くても、期間の日付は空の行で埋める", () => {
@@ -122,6 +123,7 @@ test("CI の結果は、失敗が 1 つでもあれば失敗、すべて通れ�
   assert.equal(checkResult([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "failure");
   assert.equal(checkResult([{ status: "IN_PROGRESS", conclusion: "" }]), "pending");
   assert.equal(checkResult([{ state: "PENDING" }]), "pending");
+  assert.equal(checkResult([{ conclusion: "SUCCESS" }, { state: "PENDING" }]), "pending");
 });
 
 test("着手から完了までは、最初の doing から done までを測り、やり直したら次の doing から数える", () => {
@@ -138,6 +140,10 @@ test("着手から完了までは、最初の doing から done までを測り�
     leads.map((l) => l.ms / 60_000),
     [180, 30],
   );
+});
+
+test("期間に完了したタスクが無ければ、中央値は null", () => {
+  assert.deepEqual(summarizeActivity(base).leadTime, { count: 0, medianMs: null });
 });
 
 test("期間の中央値と、期間に作ったかマージした PR を新しい順に返す", () => {

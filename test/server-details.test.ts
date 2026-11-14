@@ -157,10 +157,16 @@ test("ボードのファイルが変わると、画面に知らせる", async ()
   try {
     await until(() => received.includes(": connected\n\n"));
     const changes = () => received.split("event: change\ndata: {}\n\n").length;
-    // 一時ファイル（書きかけ）では知らせない。先に書いて、通知が来ないことを次の通知までの間で確かめる
-    writeFileSync(join(root, "docs", "decisions", "0900-sample.md.123.tmp"), "{}");
-    await new Promise((r) => setTimeout(r, 600));
+    // 一時ファイル（書きかけ）では知らせない。前のテストの書き込みの通知は、負荷が高いと遅れて届くので、静かになるまで待つ
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    for (let count = -1, i = 0; count !== changes() && i < 10; i++) {
+      count = changes();
+      await sleep(1000);
+    }
     const before = changes();
+    writeFileSync(join(root, "docs", "decisions", "0900-sample.md.123.tmp"), "{}");
+    await sleep(1000);
+    assert.equal(changes(), before, "一時ファイルで知らせた");
     writeFileSync(join(root, "docs", "decisions", "0900-sample.md"), "# 0900. 見本\n");
     await until(() => changes() > before);
     // ボード（SQLite）への書き込みでも知らせる。別のプロセスが書いたときと同じく、イベントの番号で気づく

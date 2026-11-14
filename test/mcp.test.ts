@@ -70,6 +70,11 @@ test("ツールの一覧に、ボードを扱うものがそろっている", as
   ]) {
     assert.ok(names.includes(name), name);
   }
+  // 読むだけのツールは、クライアントが確認なしで呼べるよう印を付ける
+  assert.deepEqual(
+    tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name),
+    ["get_overview", "list_tasks", "get_task", "list_decisions", "get_decision", "open_dashboard", "recall"],
+  );
 });
 
 test("タスクを足して、一覧と概要で進め方の情報を返す", async () => {

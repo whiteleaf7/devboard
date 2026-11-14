@@ -79,7 +79,7 @@ test("held-out を触ったタスクと、それに結び付いた教訓は、�
   const heldout = store.createTask({
     title: "held-out のシナリオを足す",
     description: "秘密の目印の行を説明に書いた",
-    paths: ["tools/harness/eval/heldout/"],
+    paths: ["docs/harness.md", "tools/harness/eval/heldout/"],
   });
   store.updateTask(heldout.id, { note: "秘密の目印の行をメモに書いた" });
   store.createLesson({ title: "held-out の教訓", problem: "秘密の目印の行を教訓に書いた", fix: "f", task: heldout.id });

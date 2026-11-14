@@ -74,6 +74,7 @@ test("動かしたコマンドと結果の行だけを、動かした証拠と�
     "修正した。\n- 動かした：`NAGAYA_BOARD=/tmp/b.sqlite pnpm board:apply '[]'` -> `{\"ids\":[]}`",
     "動かした: `pnpm test` → 通った\n動かした: `pnpm harness:selftest` → 45/45",
     "動かした: `node tools/x.ts a->b` → 出力が 2 行",
+    "動かした: `./scripts/smoke.sh` → 通った",
   ];
   for (const text of ran) assert.equal(hasRunEvidence(text), true, text);
   const notRun = [
@@ -83,6 +84,9 @@ test("動かしたコマンドと結果の行だけを、動かした証拠と�
     "動かした: `pnpm --filter @nagaya/devboard typecheck` → エラー無し",
     "動かした: `node --test test/` → 通った",
     "動かした: `CI=1 pnpm run lint` → 0 件",
+    "動かした: `bun test` → 通った",
+    "動かした: `pnpm --silent` → 通った",
+    "動かした: `pnpm board:apply '[]'` で断られた",
     "動かした: `pnpm board:apply '[]'`",
     "動かした: `pnpm board:apply '[]'` → ",
     "動かした: pnpm board:apply → 通った",
