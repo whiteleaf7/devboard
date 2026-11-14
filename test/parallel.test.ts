@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, realpathSync } from "node:fs";
+import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,8 +14,9 @@ for (const name of Object.keys(process.env)) if (name.startsWith("GIT_")) delete
 
 const store = join(import.meta.dirname, "..", "src", "store.ts");
 
-test("linked worktree の中からでも、main の worktree をボードの根にする", () => {
+test("linked worktree の中からでも、main の worktree をボードの根にする", (t) => {
   const main = realpathSync(mkdtempSync(join(tmpdir(), "nagaya-main-")));
+  t.after(() => rmSync(main, { recursive: true, force: true }));
   const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, stdio: "ignore" });
   git(main, "init", "-q", "-b", "main");
   git(
@@ -38,11 +39,13 @@ test("linked worktree の中からでも、main の worktree をボードの根�
   assert.equal(mainWorktreeOf(linked), main);
   assert.equal(mainWorktreeOf(main), main);
   const plain = mkdtempSync(join(tmpdir(), "nagaya-plain-"));
+  t.after(() => rmSync(plain, { recursive: true, force: true }));
   assert.equal(mainWorktreeOf(plain), plain, "git の管理下でなければ、そのまま");
 });
 
-test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えず、イベントがそろう", async () => {
+test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えず、イベントがそろう", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "nagaya-parallel-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   const boardFile = join(root, "board.sqlite");
   const script = `
     const s = await import(${JSON.stringify(store)});
