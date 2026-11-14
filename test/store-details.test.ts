@@ -92,9 +92,10 @@ test("更新は渡した項目だけを変え、メモは前後の空白を落�
   assert.equal(store.updateTask(task.id, { note: "続き" }).notes.at(-1)?.by, "ai", "書いた人の既定は ai");
   assert.equal(store.updateTask(task.id, { milestone: null, parent: null }).milestone, null);
   assert.throws(() => store.updateTask(task.id, { milestone: "M9", by: "user" }), /マイルストーン M9 はボードにない/);
-  assert.throws(() => store.updateTask(task.id, { dependsOn: [task.id] }), /循環/);
-  assert.throws(() => store.updateTask(task.id, { parent: task.id }), /循環/);
-  assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"] }), /T-999/);
+  // つながりの確かめは、決まりの検査を受けないユーザーの書き込みにもかける
+  assert.throws(() => store.updateTask(task.id, { dependsOn: [task.id], by: "user" }), /依存が循環する/);
+  assert.throws(() => store.updateTask(task.id, { parent: task.id, by: "user" }), /親子関係が循環する/);
+  assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"], by: "user" }), /タスク T-999 は存在しない/);
   assert.throws(() => store.getTask("T-999"), /T-999/);
 
   const history = store.taskHistory(task.id).map((e) => [e.kind, e.actor, e.data]);
@@ -336,4 +337,15 @@ test("マイルストーンは、ID が無ければ足し、あれば渡した�
   assert.equal(milestones.length, before + 1);
   assert.deepEqual(milestones[0], { ...first, status: "done" });
   assert.deepEqual(milestones.at(-1), { id: "M8", title: "足した", goal: "", status: "planned" });
+});
+
+test("依存をたどるとき、すでにある循環で止まらずに回り続けない", () => {
+  const insert = (id: string, number: number, dependsOn: string[]) =>
+    board()
+      .prepare("INSERT INTO tasks (id, number, data) VALUES (?, ?, ?)")
+      .run(id, number, JSON.stringify({ id, title: "循環", status: "cancelled", dependsOn, created: "", updated: "" }));
+  insert("T-2001", 2001, ["T-2002"]);
+  insert("T-2002", 2002, ["T-2001"]);
+  const task = store.createTask({ title: "循環に依存する" });
+  assert.deepEqual(store.updateTask(task.id, { dependsOn: ["T-2001"], by: "user" }).dependsOn, ["T-2001"]);
 });
