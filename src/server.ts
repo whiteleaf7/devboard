@@ -1,7 +1,9 @@
 // 開発ダッシュボードの HTTP サーバ。127.0.0.1 のみで待ち受ける。
-//   GET /               画面（public/index.html）
-//   GET /markdown.js    画面が使う Markdown の解析器（public/markdown.js）
+//   GET /               ボードの画面（public/index.html）
+//   GET /activity       活動の画面（public/activity.html）
+//   GET /base.css, /theme.js, /markdown.js  画面が共有するスタイル・テーマ・Markdown の解析器（public/）
 //   GET /api/snapshot   ボードの全データ
+//   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
 //   POST  /api/tasks       タスクの追加（画面から。createdBy: user）
 //   PATCH /api/tasks/:id   タスクの更新（画面から。メモは by: user）
@@ -14,6 +16,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { loadActivity } from "./activity-sources.ts";
 import { board, latestSeq } from "./board-db.ts";
 import { tailnetName } from "./tailnet.ts";
 import { paths, repoRoot, snapshot, createTask, updateTask, TaskCreateInput, TaskUpdateInput } from "./store.ts";
@@ -107,6 +110,18 @@ async function handleWrite(
   }
 }
 
+const ActivityDays = z.coerce.number().int().min(0).max(366);
+
+async function handleActivity(res: ServerResponse, url: URL): Promise<void> {
+  const days = ActivityDays.safeParse(url.searchParams.get("days") ?? "30");
+  if (!days.success) return send(res, 400, "text/plain; charset=utf-8", "days は 0〜366 の整数（0 は全期間）");
+  try {
+    return send(res, 200, "application/json; charset=utf-8", JSON.stringify(await loadActivity(days.data)));
+  } catch (e) {
+    return send(res, 500, "text/plain; charset=utf-8", errorMessage(e));
+  }
+}
+
 function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
   res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
   res.end(body);
@@ -158,8 +173,15 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
     switch (url.pathname) {
       case "/":
         return send(res, 200, "text/html; charset=utf-8", asset("index.html"));
+      case "/activity":
+        return send(res, 200, "text/html; charset=utf-8", asset("activity.html"));
+      case "/base.css":
+        return send(res, 200, "text/css; charset=utf-8", asset("base.css"));
+      case "/theme.js":
       case "/markdown.js":
-        return send(res, 200, "text/javascript; charset=utf-8", asset("markdown.js"));
+        return send(res, 200, "text/javascript; charset=utf-8", asset(url.pathname.slice(1)));
+      case "/api/activity":
+        return void handleActivity(res, url);
       case "/api/hosts":
         return send(res, 200, "application/json; charset=utf-8", JSON.stringify([...LOOPBACK, ...remote]));
       case "/api/snapshot":

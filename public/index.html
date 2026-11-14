@@ -3,41 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f5f2" id="theme-color">
-<script>
-  // 描画前にテーマを当てて、ちらつきを防ぐ。既定はライト（OS の設定には合わせない）
-  document.documentElement.dataset.theme = localStorage.getItem("nagaya-devboard-theme") === "dark" ? "dark" : "light";
-</script>
+<meta name="theme-color" content="#f6f5f2">
+<script src="/theme.js"></script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>nagaya devboard</title>
+<link rel="stylesheet" href="/base.css">
 <style>
-  :root {
-    color-scheme: light;
-    --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --sub: #6b6862; --line: #e3e0da;
-    --todo: #8a8780; --doing: #2f6fb5; --review: #8a5cc2; --blocked: #c2453a; --done: #3d8a5a;
-    --radius: 6px; --gap: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    font-size: 14px; color: var(--ink); background: var(--bg);
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #1b1a18; --panel: #252422; --ink: #ecebe8; --sub: #9c9890; --line: #3a3835;
-    --error-bg: #3a2220; --error-ink: #f0b4ad;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; }
-  header { display: flex; align-items: baseline; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
-  header h1 { flex: 1; }
-  header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size: 12px; }
-  .live { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
-  .live.on { background: var(--done); }
-  main { padding: 16px 24px 48px; display: grid; gap: 24px; }
-  main > * { min-width: 0; }
-  h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 0 0 8px; }
-  .errors { background: var(--error-bg, #fbeae8); color: var(--error-ink, #8a2a22); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; font-size: 12px; }
-  .errors:empty { display: none; }
-
   .milestones { display: flex; gap: var(--gap); flex-wrap: wrap; }
   .ms { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; min-width: 200px; max-width: 320px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .ms[aria-pressed="true"] { outline: 2px solid var(--doing); outline-offset: -1px; }
@@ -45,13 +16,11 @@
   .ms .goal { color: var(--sub); font-size: 12px; margin-top: 4px; }
   .ms .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
   .ms .bar i { display: block; height: 100%; background: var(--done); }
-  .tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-weight: normal; white-space: nowrap; }
   .tag.active { color: var(--doing); border-color: var(--doing); }
   .tag.done { color: var(--done); border-color: var(--done); }
 
   .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
   .card .title { overflow-wrap: anywhere; }
-  .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .col h3 { font-size: 12px; margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
   .col h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
   .col h3 .n { color: var(--sub); font-weight: normal; }
@@ -77,7 +46,6 @@
   dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); width: min(720px, 92vw); max-height: 84vh; padding: 20px 24px; }
   dialog::backdrop { background: rgb(0 0 0 / 0.3); }
   dialog .close { float: right; }
-  .empty { color: var(--sub); font-size: 12px; }
 
   .md { line-height: 1.7; overflow-wrap: anywhere; }
   .md > :first-child { margin-top: 0; }
@@ -116,15 +84,11 @@
   .note { margin: 0 0 14px; }
   .note time { color: var(--sub); font-size: 12px; display: block; margin-bottom: 2px; }
 
-  button.primary, button.secondary { font: inherit; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; }
-  button.primary { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
-  button.secondary { background: none; color: var(--ink); border: 1px solid var(--line); }
   .cards { min-height: 48px; border-radius: var(--radius); }
   .col.drop .cards { outline: 2px dashed var(--c); outline-offset: 4px; }
   .card[draggable="true"] { cursor: grab; }
   .card.dragging { opacity: 0.4; }
 
-  [hidden] { display: none !important; }
   #task-form { display: grid; gap: 12px; }
   #task-form .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   #task-form label { display: grid; gap: 4px; font-size: 12px; color: var(--sub); min-width: 0; }
@@ -147,11 +111,6 @@
 
   /* スマホ: 1 列ずつタブで切り替え、ダイアログは画面いっぱいにする */
   @media (max-width: 760px) {
-    header { flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); position: sticky; top: 0; z-index: 2; background: var(--bg); }
-    header h1 { flex: 1; }
-    header .git { display: none; }
-    main { padding: 12px 16px 32px; padding-bottom: max(32px, env(safe-area-inset-bottom)); gap: 20px; }
-
     .milestones { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
     .milestones::-webkit-scrollbar { display: none; }
     .ms { flex: 0 0 78%; max-width: none; scroll-snap-align: start; }
@@ -188,6 +147,8 @@
 <body>
 <header>
   <h1 id="name">nagaya</h1>
+  <nav class="pages" aria-label="画面"><a href="/" aria-current="page">ボード</a><a href="/activity">活動</a></nav>
+  <span class="spacer"></span>
   <span class="git" id="git"></span>
   <button type="button" class="primary" id="new-task">タスクを追加</button>
   <button type="button" class="secondary" id="open-settings">設定</button>
@@ -284,13 +245,6 @@ const COLUMNS = [
 const FINISHED = ["done", "cancelled"];
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
 const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
-const THEME_KEY = "nagaya-devboard-theme";
-const THEME_COLOR = { light: "#f6f5f2", dark: "#1b1a18" };
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  document.getElementById("theme-color").content = THEME_COLOR[theme];
-}
-applyTheme(document.documentElement.dataset.theme);
 document.getElementById("open-settings").onclick = () => {
   for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
   document.getElementById("settings").showModal();

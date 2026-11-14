@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f2">
+<script src="/theme.js"></script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>活動 · nagaya devboard</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  /* グラフの色。1 系列の青と、量を表す青の段階（ヒートマップ）。ダークは暗い面に合わせた段を選ぶ */
+  :root {
+    --series: #2a78d6; --grid: #ecebe6; --axis: #c3c2b7;
+    --heat-0: #f0efec; --heat-1: #cde2fb; --heat-2: #9ec5f4; --heat-3: #6da7ec; --heat-4: #3987e5; --heat-5: #1c5cab;
+  }
+  :root[data-theme="dark"] {
+    --series: #3987e5; --grid: #302f2c; --axis: #45433f;
+    --heat-0: #2e2d2a; --heat-1: #0d366b; --heat-2: #184f95; --heat-3: #256abf; --heat-4: #3987e5; --heat-5: #86b6ef;
+  }
+
+  .intro h2 { font-size: 22px; color: var(--ink); font-weight: 600; margin: 0 0 6px; }
+  .intro p { margin: 0; color: var(--sub); line-height: 1.6; }
+  .intro strong { color: var(--ink); }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+  .seg button { font: inherit; color: var(--sub); background: none; border: 0; border-left: 1px solid var(--line); padding: 5px 14px; cursor: pointer; min-height: 32px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--bg); }
+
+  .content { display: grid; gap: 16px; transition: opacity 0.15s; }
+  .content.loading { opacity: 0.5; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--gap); }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .tile .label { color: var(--sub); font-size: 12px; }
+  .tile .value { font-size: 28px; font-weight: 600; margin: 6px 0 2px; }
+  .tile .delta { color: var(--sub); font-size: 12px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .card h3 { font-size: 15px; margin: 0; }
+  .card .caption { color: var(--sub); font-size: 12px; margin: 4px 0 12px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .chart .gridline { stroke: var(--grid); stroke-width: 1; }
+  .chart .baseline { stroke: var(--axis); stroke-width: 1; }
+  .chart .bar { fill: var(--series); }
+  .chart .hit { fill: transparent; cursor: default; outline: none; }
+  .chart .hit:hover + .bar, .chart .hit:focus-visible + .bar { opacity: 0.75; }
+  .chart .hit:focus-visible { stroke: var(--ink); stroke-width: 1; }
+  .chart .cell:hover, .chart .cell:focus-visible { stroke: var(--ink); stroke-width: 1.5; outline: none; }
+  .ramp { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 11px; margin-top: 10px; }
+  .ramp i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .tooltip { position: fixed; z-index: 5; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+  .tooltip strong { font-size: 14px; margin-right: 6px; }
+  .tooltip span { color: var(--sub); }
+
+  details.table { margin-top: 12px; font-size: 12px; }
+  details.table summary { color: var(--sub); cursor: pointer; }
+  details.table table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  details.table th, details.table td { padding: 3px 12px 3px 0; text-align: right; border-bottom: 1px solid var(--line); }
+  details.table th:first-child, details.table td:first-child { text-align: left; }
+
+  @media (max-width: 760px) {
+    .intro h2 { font-size: 18px; }
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile .value { font-size: 22px; }
+    .seg button { padding: 5px 10px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>nagaya</h1>
+  <nav class="pages" aria-label="画面"><a href="/">ボード</a><a href="/activity" aria-current="page">活動</a></nav>
+  <span class="spacer"></span>
+  <span class="live" id="live" title="変更を監視中"></span>
+</header>
+<main>
+  <section class="intro">
+    <h2>開発の活動</h2>
+    <p id="summary">読み込み中</p>
+  </section>
+  <div class="controls">
+    <div class="seg" id="days" role="group" aria-label="期間"></div>
+    <div class="seg" id="metric" role="group" aria-label="グラフに出す数"></div>
+  </div>
+  <div class="errors" id="errors"></div>
+  <div class="content" id="content">
+    <div class="tiles" id="tiles"></div>
+    <section class="card">
+      <h3>日別の推移</h3>
+      <p class="caption" id="daily-caption"></p>
+      <div class="chart" id="daily"></div>
+      <details class="table"><summary>表で見る</summary><div id="daily-table"></div></details>
+    </section>
+    <section class="card">
+      <h3>曜日 × 時間帯</h3>
+      <p class="caption" id="heatmap-caption"></p>
+      <div class="chart" id="heatmap"></div>
+      <div class="ramp" aria-hidden="true">少ない<i style="background: var(--heat-1)"></i><i style="background: var(--heat-2)"></i><i style="background: var(--heat-3)"></i><i style="background: var(--heat-4)"></i><i style="background: var(--heat-5)"></i>多い</div>
+    </section>
+  </div>
+</main>
+<div class="tooltip" id="tooltip" hidden></div>
+<script type="module">
+const DAYS = [[7, "7日"], [30, "30日"], [0, "全期間"]];
+const METRICS = [["commits", "コミット"], ["prMerged", "PR マージ"], ["tasksDone", "完了タスク"]];
+const METRIC_UNIT = { commits: "コミット", prMerged: "PR マージ", tasksDone: "タスク完了" };
+const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
+const SVG = "http://www.w3.org/2000/svg";
+
+const params = new URLSearchParams(location.search);
+let days = DAYS.some(([d]) => String(d) === params.get("days")) ? Number(params.get("days")) : 30;
+let metric = METRICS.some(([m]) => m === params.get("metric")) ? params.get("metric") : "commits";
+let data = null;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const c of children) node.append(c);
+  return node;
+};
+const svgEl = (tag, attrs = {}) => {
+  const node = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+const shortDate = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+const periodLabel = () => (days ? `直近${days}日` : "全期間");
+
+// ---- 操作 ----
+
+function segment(container, items, current, onPick) {
+  container.replaceChildren(...items.map(([value, label]) => {
+    const b = el("button", { type: "button", textContent: label });
+    b.setAttribute("aria-pressed", String(value === current));
+    b.onclick = () => onPick(value);
+    return b;
+  }));
+}
+
+function renderControls() {
+  segment($("days"), DAYS, days, (d) => { days = d; saveState(); load(); });
+  segment($("metric"), METRICS, metric, (m) => { metric = m; saveState(); render(); });
+}
+
+function saveState() {
+  history.replaceState(null, "", `?days=${days}&metric=${metric}`);
+  renderControls();
+}
+
+// ---- ツールチップ: 値を先に、何の数かを後に ----
+
+function showTip(event, value, label) {
+  const tip = $("tooltip");
+  tip.replaceChildren(el("strong", { textContent: value }), el("span", { textContent: label }));
+  tip.hidden = false;
+  const r = event.type === "focus" ? event.target.getBoundingClientRect() : { left: event.clientX, top: event.clientY, width: 0 };
+  const x = Math.min(r.left + r.width / 2 + 12, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = `${Math.max(8, x)}px`;
+  tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 8)}px`;
+}
+const hideTip = () => { $("tooltip").hidden = true; };
+function withTip(node, value, label) {
+  node.addEventListener("pointermove", (e) => showTip(e, value, label));
+  node.addEventListener("focus", (e) => showTip(e, value, label));
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("blur", hideTip);
+}
+
+// ---- 目盛り: 4 本前後のきりの良い値 ----
+
+function niceMax(max) {
+  if (max <= 4) return { top: Math.max(max, 1), step: 1 };
+  const raw = max / 4;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= raw);
+  return { top: Math.ceil(max / step) * step, step };
+}
+
+// ---- 日別の棒グラフ ----
+
+function renderDaily() {
+  const rows = data.daily;
+  const width = Math.max($("daily").clientWidth, 280);
+  const height = 220;
+  const pad = { top: 8, right: 4, bottom: 24, left: 32 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const { top, step } = niceMax(Math.max(0, ...rows.map((r) => r[metric])));
+  const y = (v) => pad.top + plotH - (v / top) * plotH;
+  const band = plotW / rows.length;
+  const barW = Math.max(2, Math.min(24, band - 2));
+  const svg = svgEl("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": `${METRIC_UNIT[metric]}の日別の件数` });
+
+  for (let v = 0; v <= top; v += step) {
+    svg.append(svgEl("line", { class: v ? "gridline" : "baseline", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
+    const label = svgEl("text", { x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
+    label.textContent = v.toLocaleString("ja-JP");
+    svg.append(label);
+  }
+  const labelEvery = Math.ceil(rows.length / Math.max(1, Math.floor(plotW / 44)));
+  rows.forEach((row, i) => {
+    const cx = pad.left + band * i + band / 2;
+    const value = row[metric];
+    // 棒より広い当たり判定。帯の幅いっぱいを触れる範囲にする
+    const hit = svgEl("rect", { class: "hit", x: pad.left + band * i, y: pad.top, width: band, height: plotH, tabindex: 0 });
+    withTip(hit, value.toLocaleString("ja-JP"), `${METRIC_UNIT[metric]} · ${shortDate(row.date)}`);
+    svg.append(hit);
+    if (value > 0) {
+      // 上の端だけ 4px 丸め、底は基線にそろえて角のままにする
+      const x = cx - barW / 2, yTop = y(value), h = pad.top + plotH - yTop, r = Math.min(4, barW / 2, h);
+      svg.append(svgEl("path", {
+        class: "bar",
+        d: `M${x},${yTop + h}V${yTop + r}Q${x},${yTop} ${x + r},${yTop}H${x + barW - r}Q${x + barW},${yTop} ${x + barW},${yTop + r}V${yTop + h}Z`,
+      }));
+    }
+    if (i % labelEvery === (rows.length - 1) % labelEvery) {
+      const label = svgEl("text", { x: cx, y: height - 6, "text-anchor": "middle" });
+      label.textContent = shortDate(row.date);
+      svg.append(label);
+    }
+  });
+  $("daily").replaceChildren(svg);
+  $("daily-caption").textContent = `${METRIC_UNIT[metric]}の件数 · 日付ごと · ${periodLabel()}`;
+
+  $("daily-table").replaceChildren(el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { textContent: "日付" }), ...METRICS.map(([, label]) => el("th", { textContent: label })))),
+    el("tbody", {}, ...rows.slice().reverse().map((row) => el("tr", {},
+      el("td", { textContent: row.date }),
+      ...METRICS.map(([m]) => el("td", { textContent: row[m].toLocaleString("ja-JP") })))))));
+}
+
+// ---- 曜日 × 時間帯 ----
+
+function renderHeatmap() {
+  const grid = data.heatmap[metric];
+  const max = Math.max(0, ...grid.flat());
+  const width = Math.max($("heatmap").clientWidth, 280);
+  const left = 22, bottom = 18, gap = 2;
+  // 横は幅いっぱいに広げ、縦は詰まりすぎない高さで止める
+  const cellW = (width - left) / 24;
+  const cellH = Math.min(cellW, 28);
+  const height = cellH * 7 + bottom;
+  const svg = svgEl("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": `${METRIC_UNIT[metric]}の曜日と時間帯ごとの件数` });
+  grid.forEach((hours, d) => {
+    const label = svgEl("text", { x: 0, y: d * cellH + cellH / 2 + 4 });
+    label.textContent = WEEKDAYS[d];
+    svg.append(label);
+    hours.forEach((value, h) => {
+      const level = value === 0 ? 0 : Math.max(1, Math.ceil((value / max) * 5));
+      const rect = svgEl("rect", {
+        class: "cell", x: left + h * cellW, y: d * cellH, width: cellW - gap, height: cellH - gap, rx: 3,
+        style: `fill: var(--heat-${level})`,
+      });
+      withTip(rect, value.toLocaleString("ja-JP"), `${METRIC_UNIT[metric]} · ${WEEKDAYS[d]}曜 ${h}時台`);
+      svg.append(rect);
+    });
+  });
+  for (let h = 0; h < 24; h += 3) {
+    const label = svgEl("text", { x: left + h * cellW + (cellW - gap) / 2, y: height - 4, "text-anchor": "middle" });
+    label.textContent = String(h);
+    svg.append(label);
+  }
+  $("heatmap").replaceChildren(svg);
+  $("heatmap-caption").textContent = `${METRIC_UNIT[metric]}の件数 · ${data.range.timeZone} · ${periodLabel()}`;
+}
+
+// ---- 数字のタイル ----
+
+function deltaText(key) {
+  if (!data.previous) return "";
+  const diff = data.totals[key] - data.previous[key];
+  const before = data.previous[key];
+  const pct = before ? ` (${diff >= 0 ? "+" : ""}${Math.round((diff / before) * 100)}%)` : "";
+  return `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff).toLocaleString("ja-JP")}${pct} 前の${days}日比`;
+}
+
+function renderTiles() {
+  const prMissing = Boolean(data.sources.pullRequests);
+  const tiles = [
+    ["コミット", "commits", deltaText("commits")],
+    ["PR マージ", "prMerged", prMissing ? "PR を取得できない" : deltaText("prMerged")],
+    ["完了したタスク", "tasksDone", deltaText("tasksDone")],
+    ["教訓", "lessons", deltaText("lessons")],
+    ["決定記録", "decisions", deltaText("decisions")],
+    ["あなたの操作", "userActions", `AI の操作 ${data.totals.aiActions.toLocaleString("ja-JP")} 件`],
+  ];
+  $("tiles").replaceChildren(...tiles.map(([label, key, sub]) => el("div", { className: "tile" },
+    el("div", { className: "label", textContent: label }),
+    el("div", { className: "value", textContent: key === "prMerged" && prMissing ? "—" : data.totals[key].toLocaleString("ja-JP") }),
+    el("div", { className: "delta", textContent: sub }))));
+}
+
+function renderSummary() {
+  const { totals, range } = data;
+  const peak = data.heatmap[metric].reduce((acc, hours) => acc.map((v, h) => v + hours[h]), Array(24).fill(0));
+  const peakHour = peak.indexOf(Math.max(...peak));
+  const strong = (text) => el("strong", { textContent: text });
+  const parts = [
+    `${periodLabel()}（${shortDate(range.from)}〜${shortDate(range.to)}）で `,
+    strong(totals.commits.toLocaleString("ja-JP")), " コミット・",
+    ...(data.sources.pullRequests ? [] : [strong(totals.prMerged.toLocaleString("ja-JP")), " PR マージ・"]),
+    strong(totals.tasksDone.toLocaleString("ja-JP")), " タスク完了。",
+    ...(peak[peakHour] ? [`${METRIC_UNIT[metric]}がいちばん多いのは `, strong(`${peakHour}時台`), "。"] : []),
+  ];
+  $("summary").replaceChildren(...parts);
+}
+
+function render() {
+  if (!data) return;
+  $("errors").textContent = data.sources.pullRequests ?? "";
+  renderSummary();
+  renderTiles();
+  renderDaily();
+  renderHeatmap();
+}
+
+// 読み込み中は前の図を薄く残し、レイアウトを動かさない
+let requested = 0;
+async function load() {
+  const id = ++requested;
+  $("content").classList.add("loading");
+  try {
+    const res = await fetch(`/api/activity?days=${days}`);
+    if (!res.ok) throw new Error(await res.text());
+    const next = await res.json();
+    if (id !== requested) return;
+    data = next;
+    render();
+  } catch (err) {
+    $("errors").textContent = `活動を読み込めない: ${err.message}`;
+  } finally {
+    if (id === requested) $("content").classList.remove("loading");
+  }
+}
+
+function listen() {
+  const es = new EventSource("/api/events");
+  es.onopen = () => $("live").classList.add("on");
+  es.addEventListener("change", load);
+  es.onerror = () => $("live").classList.remove("on");
+}
+
+let resizeTimer;
+addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 100); });
+
+renderControls();
+load();
+listen();
+</script>
+</body>
+</html>

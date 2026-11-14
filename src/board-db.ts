@@ -4,7 +4,7 @@
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { mainWorktreeOf } from "./worktree.ts";
 
 // 書き込みが重なったときに待つ時間。書き込みは数ミリ秒で終わる
@@ -107,18 +107,24 @@ export function appendEvent(db: DatabaseSync, event: Omit<BoardEvent, "seq">): v
   );
 }
 
+const toEvent = (row: Record<string, SQLOutputValue>): BoardEvent => ({
+  seq: Number(row.seq),
+  at: String(row.at),
+  actor: row.actor === null ? null : String(row.actor),
+  kind: String(row.kind) as EventKind,
+  subject: String(row.subject),
+  data: JSON.parse(String(row.data)),
+});
+
 export function eventsOf(db: DatabaseSync, subject: string): BoardEvent[] {
   return db
     .prepare("SELECT seq, at, actor, kind, subject, data FROM events WHERE subject = ? ORDER BY seq")
     .all(subject)
-    .map((row) => ({
-      seq: Number(row.seq),
-      at: String(row.at),
-      actor: row.actor === null ? null : String(row.actor),
-      kind: String(row.kind) as EventKind,
-      subject: String(row.subject),
-      data: JSON.parse(String(row.data)),
-    }));
+    .map(toEvent);
+}
+
+export function allEvents(db: DatabaseSync): BoardEvent[] {
+  return db.prepare("SELECT seq, at, actor, kind, subject, data FROM events ORDER BY seq").all().map(toEvent);
 }
 
 // ダッシュボードが変更を知るため。ほかのプロセスの書き込みも、自分の書き込みも、イベントの番号が増える

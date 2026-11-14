@@ -114,3 +114,21 @@ test("tailnet の名前は Host と https の Origin で許可し、それ以外
     403,
   );
 });
+
+test("活動の画面と集計を返し、期間の指定が不正なら 400 で理由を返す", async () => {
+  for (const path of ["/activity", "/base.css", "/theme.js"])
+    assert.equal((await fetch(base + path)).status, 200, path);
+
+  await call("PATCH", "/api/tasks/T-001", { status: "done", note: "終えた" });
+  const res = await fetch(`${base}/api/activity?days=7`);
+  assert.equal(res.status, 200);
+  const activity = await res.json();
+  assert.equal(activity.daily.length, 7);
+  assert.equal(activity.totals.tasksDone, 1);
+  // 一時的なボードの根は git のリポジトリではないので、PR は取れず、理由が付く
+  assert.match(activity.sources.pullRequests, /PR を取得できない/);
+
+  const bad = await fetch(`${base}/api/activity?days=abc`);
+  assert.equal(bad.status, 400);
+  assert.match(await bad.text(), /days/);
+});

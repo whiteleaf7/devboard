@@ -1,0 +1,46 @@
+/* ボードと活動の画面が共有する土台: 色・文字・ヘッダー・ボタン */
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --sub: #6b6862; --line: #e3e0da;
+  --todo: #8a8780; --doing: #2f6fb5; --review: #8a5cc2; --blocked: #c2453a; --done: #3d8a5a;
+  --radius: 6px; --gap: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  font-size: 14px; color: var(--ink); background: var(--bg);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1a18; --panel: #252422; --ink: #ecebe8; --sub: #9c9890; --line: #3a3835;
+  --error-bg: #3a2220; --error-ink: #f0b4ad;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+header .spacer { flex: 1; }
+header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size: 12px; }
+.pages { display: flex; gap: 4px; }
+.pages a { color: var(--sub); text-decoration: none; padding: 4px 10px; border-radius: var(--radius); }
+.pages a:hover { background: var(--panel); }
+.pages a[aria-current="page"] { color: var(--ink); background: var(--panel); border: 1px solid var(--line); font-weight: 600; }
+.pages a:not([aria-current]) { border: 1px solid transparent; }
+.live { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+.live.on { background: var(--done); }
+main { padding: 16px 24px 48px; display: grid; gap: 24px; }
+main > * { min-width: 0; }
+h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 0 0 8px; }
+.errors { background: var(--error-bg, #fbeae8); color: var(--error-ink, #8a2a22); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; font-size: 12px; }
+.errors:empty { display: none; }
+.tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-weight: normal; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.empty { color: var(--sub); font-size: 12px; }
+button.primary, button.secondary { font: inherit; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; }
+button.primary { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
+button.secondary { background: none; color: var(--ink); border: 1px solid var(--line); }
+[hidden] { display: none !important; }
+
+@media (max-width: 760px) {
+  header { flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); position: sticky; top: 0; z-index: 2; background: var(--bg); }
+  header .git { display: none; }
+  /* 画面の切り替えは 2 段目に置き、1 段目のボタンを折り返させない */
+  .pages { order: 1; flex-basis: 100%; }
+  main { padding: 12px 16px 32px; padding-bottom: max(32px, env(safe-area-inset-bottom)); gap: 20px; }
+}
