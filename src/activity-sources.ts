@@ -4,9 +4,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { summarizeActivity, PullRequest, type Activity } from "./activity.ts";
+import { milestoneProgress, summarizeActivity, PR_FIELDS, PullRequest, type Activity } from "./activity.ts";
 import { allEvents, board } from "./board-db.ts";
-import { readDecisions, repoRoot } from "./store.ts";
+import { readDecisions, readProject, readTasks, repoRoot } from "./store.ts";
 
 const run = promisify(execFile);
 
@@ -42,11 +42,10 @@ async function readPullRequests(): Promise<PullRequests> {
   if (cached && Date.now() - cached.at < PR_CACHE_MS) return cached.result;
   let result: PullRequests;
   try {
-    const { stdout } = await run(
-      "gh",
-      ["pr", "list", "--state", "all", "--limit", "1000", "--json", "number,title,state,url,createdAt,mergedAt"],
-      { cwd: root, timeout: GH_TIMEOUT_MS },
-    );
+    const { stdout } = await run("gh", ["pr", "list", "--state", "all", "--limit", "1000", "--json", PR_FIELDS], {
+      cwd: root,
+      timeout: GH_TIMEOUT_MS,
+    });
     result = { pullRequests: z.array(PullRequest).parse(JSON.parse(stdout)), error: null };
   } catch (e) {
     result = { pullRequests: [], error: `PR を取得できない: ${ghError(e)}` };
@@ -55,7 +54,10 @@ async function readPullRequests(): Promise<PullRequests> {
   return result;
 }
 
-export type ActivityResponse = Activity & { sources: { pullRequests: string | null } };
+export type ActivityResponse = Activity & {
+  milestones: ReturnType<typeof milestoneProgress>;
+  sources: { pullRequests: string | null };
+};
 
 export async function loadActivity(days: number, now = new Date()): Promise<ActivityResponse> {
   const [commitTimes, prs] = await Promise.all([readCommitTimes(), readPullRequests()]);
@@ -70,5 +72,9 @@ export async function loadActivity(days: number, now = new Date()): Promise<Acti
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     days,
   });
-  return { ...activity, sources: { pullRequests: prs.error } };
+  return {
+    ...activity,
+    milestones: milestoneProgress(readProject().milestones, readTasks().tasks),
+    sources: { pullRequests: prs.error },
+  };
 }

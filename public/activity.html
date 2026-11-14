@@ -33,7 +33,7 @@
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--gap); }
   .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
   .tile .label { color: var(--sub); font-size: 12px; }
-  .tile .value { font-size: 28px; font-weight: 600; margin: 6px 0 2px; }
+  .tile .value { font-size: 28px; font-weight: 600; margin: 6px 0 2px; line-height: 1.2; }
   .tile .delta { color: var(--sub); font-size: 12px; }
 
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
@@ -56,6 +56,32 @@
   .tooltip strong { font-size: 14px; margin-right: 6px; }
   .tooltip span { color: var(--sub); }
 
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table th { color: var(--sub); font-weight: 600; font-size: 12px; text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .grid-table td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .grid-table th:first-child, .grid-table td:first-child { text-align: left; padding-left: 0; }
+  .grid-table td.name { white-space: normal; overflow-wrap: anywhere; }
+  .grid-table tfoot td { font-weight: 600; border-bottom: 0; }
+  .grid-table .id { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); margin-right: 8px; }
+  .grid-table .tag { margin-left: 8px; }
+  .grid-table a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .grid-table a:hover { text-decoration-color: currentColor; }
+  .table-scroll { overflow-x: auto; }
+  .progress { display: flex; gap: 2px; width: 120px; height: 8px; margin-left: auto; border-radius: 4px; overflow: hidden; background: var(--line); }
+  .progress i { display: block; height: 100%; }
+  .progress .done { background: var(--done); }
+  .progress .cancelled { background: var(--todo); }
+  .tag.active { color: var(--doing); border-color: var(--doing); }
+  .tag.done { color: var(--done); border-color: var(--done); }
+  .check { display: inline-flex; align-items: center; gap: 5px; }
+  .check::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .state-merged { --c: var(--review); }
+  .state-open { --c: var(--done); }
+  .state-closed { --c: var(--todo); }
+  .check-success { --c: var(--done); }
+  .check-failure { --c: var(--blocked); }
+  .check-pending { --c: #c98500; }
+
   details.table { margin-top: 12px; font-size: 12px; }
   details.table summary { color: var(--sub); cursor: pointer; }
   details.table table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
@@ -67,6 +93,13 @@
     .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .tile .value { font-size: 22px; }
     .seg button { padding: 5px 10px; }
+    .progress { width: 56px; }
+    /* PR は列が多いので、1 件を折り返す 1 つの塊にし、見出しの代わりに項目名を添える */
+    #prs thead { display: none; }
+    #prs tr { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    #prs td { border: 0; padding: 0; text-align: left; color: var(--sub); }
+    #prs td.name { flex-basis: 100%; color: var(--ink); }
+    #prs td[data-label]::before { content: attr(data-label) " "; }
   }
 </style>
 </head>
@@ -81,6 +114,11 @@
   <section class="intro">
     <h2>開発の活動</h2>
     <p id="summary">読み込み中</p>
+  </section>
+  <section class="card">
+    <h3>マイルストーンの進み</h3>
+    <p class="caption">いまのタスクの状態。期間には関係しない</p>
+    <div class="table-scroll" id="milestones"></div>
   </section>
   <div class="controls">
     <div class="seg" id="days" role="group" aria-label="期間"></div>
@@ -101,6 +139,11 @@
       <div class="chart" id="heatmap"></div>
       <div class="ramp" aria-hidden="true">少ない<i style="background: var(--heat-1)"></i><i style="background: var(--heat-2)"></i><i style="background: var(--heat-3)"></i><i style="background: var(--heat-4)"></i><i style="background: var(--heat-5)"></i>多い</div>
     </section>
+    <section class="card">
+      <h3>PR の履歴</h3>
+      <p class="caption" id="prs-caption"></p>
+      <div class="table-scroll" id="prs"></div>
+    </section>
   </div>
 </main>
 <div class="tooltip" id="tooltip" hidden></div>
@@ -117,8 +160,9 @@ let metric = METRICS.some(([m]) => m === params.get("metric")) ? params.get("met
 let data = null;
 
 const $ = (id) => document.getElementById(id);
-const el = (tag, props = {}, ...children) => {
+const el = (tag, { dataset = {}, ...props } = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
+  Object.assign(node.dataset, dataset);
   for (const c of children) node.append(c);
   return node;
 };
@@ -129,6 +173,13 @@ const svgEl = (tag, attrs = {}) => {
 };
 const shortDate = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 const periodLabel = () => (days ? `直近${days}日` : "全期間");
+const num = (n) => n.toLocaleString("ja-JP");
+function duration(ms) {
+  const minutes = ms / 60_000;
+  if (minutes < 60) return `${Math.max(1, Math.round(minutes))} 分`;
+  const hours = minutes / 60;
+  return hours < 48 ? `${hours.toFixed(1)} 時間` : `${(hours / 24).toFixed(1)} 日`;
+}
 
 // ---- 操作 ----
 
@@ -198,7 +249,7 @@ function renderDaily() {
   for (let v = 0; v <= top; v += step) {
     svg.append(svgEl("line", { class: v ? "gridline" : "baseline", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
     const label = svgEl("text", { x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
-    label.textContent = v.toLocaleString("ja-JP");
+    label.textContent = num(v);
     svg.append(label);
   }
   const labelEvery = Math.ceil(rows.length / Math.max(1, Math.floor(plotW / 44)));
@@ -207,7 +258,7 @@ function renderDaily() {
     const value = row[metric];
     // 棒より広い当たり判定。帯の幅いっぱいを触れる範囲にする
     const hit = svgEl("rect", { class: "hit", x: pad.left + band * i, y: pad.top, width: band, height: plotH, tabindex: 0 });
-    withTip(hit, value.toLocaleString("ja-JP"), `${METRIC_UNIT[metric]} · ${shortDate(row.date)}`);
+    withTip(hit, num(value), `${METRIC_UNIT[metric]} · ${shortDate(row.date)}`);
     svg.append(hit);
     if (value > 0) {
       // 上の端だけ 4px 丸め、底は基線にそろえて角のままにする
@@ -230,7 +281,7 @@ function renderDaily() {
     el("thead", {}, el("tr", {}, el("th", { textContent: "日付" }), ...METRICS.map(([, label]) => el("th", { textContent: label })))),
     el("tbody", {}, ...rows.slice().reverse().map((row) => el("tr", {},
       el("td", { textContent: row.date }),
-      ...METRICS.map(([m]) => el("td", { textContent: row[m].toLocaleString("ja-JP") })))))));
+      ...METRICS.map(([m]) => el("td", { textContent: num(row[m]) })))))));
 }
 
 // ---- 曜日 × 時間帯 ----
@@ -255,7 +306,7 @@ function renderHeatmap() {
         class: "cell", x: left + h * cellW, y: d * cellH, width: cellW - gap, height: cellH - gap, rx: 3,
         style: `fill: var(--heat-${level})`,
       });
-      withTip(rect, value.toLocaleString("ja-JP"), `${METRIC_UNIT[metric]} · ${WEEKDAYS[d]}曜 ${h}時台`);
+      withTip(rect, num(value), `${METRIC_UNIT[metric]} · ${WEEKDAYS[d]}曜 ${h}時台`);
       svg.append(rect);
     });
   });
@@ -275,7 +326,7 @@ function deltaText(key) {
   const diff = data.totals[key] - data.previous[key];
   const before = data.previous[key];
   const pct = before ? ` (${diff >= 0 ? "+" : ""}${Math.round((diff / before) * 100)}%)` : "";
-  return `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff).toLocaleString("ja-JP")}${pct} 前の${days}日比`;
+  return `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${num(Math.abs(diff))}${pct} 前の${days}日比`;
 }
 
 function renderTiles() {
@@ -286,12 +337,72 @@ function renderTiles() {
     ["完了したタスク", "tasksDone", deltaText("tasksDone")],
     ["教訓", "lessons", deltaText("lessons")],
     ["決定記録", "decisions", deltaText("decisions")],
-    ["あなたの操作", "userActions", `AI の操作 ${data.totals.aiActions.toLocaleString("ja-JP")} 件`],
+    ["あなたの操作", "userActions", `AI の操作 ${num(data.totals.aiActions)} 件`],
   ];
-  $("tiles").replaceChildren(...tiles.map(([label, key, sub]) => el("div", { className: "tile" },
+  const tile = (label, value, sub) => el("div", { className: "tile" },
     el("div", { className: "label", textContent: label }),
-    el("div", { className: "value", textContent: key === "prMerged" && prMissing ? "—" : data.totals[key].toLocaleString("ja-JP") }),
-    el("div", { className: "delta", textContent: sub }))));
+    el("div", { className: "value", textContent: value }),
+    el("div", { className: "delta", textContent: sub }));
+  const { leadTime } = data;
+  $("tiles").replaceChildren(
+    ...tiles.map(([label, key, sub]) => tile(label, key === "prMerged" && prMissing ? "—" : num(data.totals[key]), sub)),
+    tile("着手から完了まで", leadTime.medianMs === null ? "—" : duration(leadTime.medianMs), `中央値 · ${num(leadTime.count)} 件`),
+  );
+}
+
+// ---- マイルストーンの表 ----
+
+const MILESTONE_STATUS = { planned: "予定", active: "進行中", done: "完了" };
+
+function progressBar(row) {
+  const share = (n) => (row.total ? (n / row.total) * 100 : 0);
+  const bar = el("div", { className: "progress", role: "img", ariaLabel: `完了 ${row.done}・中止 ${row.cancelled}・残り ${row.open}` },
+    ...(row.done ? [el("i", { className: "done", style: `width: ${share(row.done)}%` })] : []),
+    ...(row.cancelled ? [el("i", { className: "cancelled", style: `width: ${share(row.cancelled)}%` })] : []));
+  bar.title = bar.ariaLabel;
+  return bar;
+}
+
+function renderMilestones() {
+  const { rows, total } = data.milestones;
+  const cells = (row, name) => el("tr", {},
+    el("td", { className: "name" }, ...name),
+    ...[row.total, row.done, row.cancelled, row.open].map((n) => el("td", { textContent: num(n) })),
+    el("td", {}, progressBar(row)));
+  $("milestones").replaceChildren(el("table", { className: "grid-table" },
+    el("thead", {}, el("tr", {}, ...["マイルストーン", "合計", "完了", "中止", "残り", "進み"].map((h) => el("th", { textContent: h })))),
+    el("tbody", {}, ...rows.map((row) => cells(row, [
+      ...(row.id ? [el("span", { className: "id", textContent: row.id })] : []),
+      row.title,
+      ...(row.status ? [el("span", { className: `tag ${row.status}`, textContent: MILESTONE_STATUS[row.status] ?? row.status })] : []),
+    ]))),
+    el("tfoot", {}, cells(total, [total.title]))));
+}
+
+// ---- PR の履歴 ----
+
+const PR_STATE = { MERGED: ["マージ", "merged"], OPEN: ["オープン", "open"], CLOSED: ["クローズ", "closed"] };
+const CHECK = { success: "成功", failure: "失敗", pending: "実行中" };
+
+function renderPullRequests() {
+  const prs = data.pullRequests;
+  $("prs-caption").textContent = data.sources.pullRequests ?? `${periodLabel()}に作ったか、マージした PR · 新しい順`;
+  if (data.sources.pullRequests) return $("prs").replaceChildren();
+  if (!prs.length) return $("prs").replaceChildren(el("p", { className: "empty", textContent: "この期間の PR はない" }));
+  $("prs").replaceChildren(el("table", { className: "grid-table" },
+    el("thead", {}, el("tr", {}, ...["PR", "状態", "CI", "マージまで", "差分", "作成"].map((h) => el("th", { textContent: h })))),
+    el("tbody", {}, ...prs.map((pr) => {
+      const [stateLabel, stateClass] = PR_STATE[pr.state];
+      return el("tr", {},
+        el("td", { className: "name" },
+          el("span", { className: "id", textContent: `#${pr.number}` }),
+          el("a", { href: pr.url, target: "_blank", rel: "noreferrer", textContent: pr.title })),
+        el("td", {}, el("span", { className: `check state-${stateClass}`, textContent: stateLabel })),
+        el("td", { dataset: { label: "CI" } }, pr.checks ? el("span", { className: `check check-${pr.checks}`, textContent: CHECK[pr.checks] }) : "—"),
+        el("td", { dataset: { label: "マージまで" }, textContent: pr.mergeMs === null ? "—" : duration(pr.mergeMs) }),
+        el("td", { textContent: `+${num(pr.additions)} −${num(pr.deletions)}` }),
+        el("td", { textContent: new Date(pr.createdAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) }));
+    }))));
 }
 
 function renderSummary() {
@@ -301,9 +412,9 @@ function renderSummary() {
   const strong = (text) => el("strong", { textContent: text });
   const parts = [
     `${periodLabel()}（${shortDate(range.from)}〜${shortDate(range.to)}）で `,
-    strong(totals.commits.toLocaleString("ja-JP")), " コミット・",
-    ...(data.sources.pullRequests ? [] : [strong(totals.prMerged.toLocaleString("ja-JP")), " PR マージ・"]),
-    strong(totals.tasksDone.toLocaleString("ja-JP")), " タスク完了。",
+    strong(num(totals.commits)), " コミット・",
+    ...(data.sources.pullRequests ? [] : [strong(num(totals.prMerged)), " PR マージ・"]),
+    strong(num(totals.tasksDone)), " タスク完了。",
     ...(peak[peakHour] ? [`${METRIC_UNIT[metric]}がいちばん多いのは `, strong(`${peakHour}時台`), "。"] : []),
   ];
   $("summary").replaceChildren(...parts);
@@ -313,9 +424,11 @@ function render() {
   if (!data) return;
   $("errors").textContent = data.sources.pullRequests ?? "";
   renderSummary();
+  renderMilestones();
   renderTiles();
   renderDaily();
   renderHeatmap();
+  renderPullRequests();
 }
 
 // 読み込み中は前の図を薄く残し、レイアウトを動かさない

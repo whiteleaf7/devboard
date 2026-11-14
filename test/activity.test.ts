@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeActivity, type ActivityInput } from "../src/activity.ts";
+import {
+  checkResult,
+  leadTimes,
+  milestoneProgress,
+  summarizeActivity,
+  type ActivityEvent,
+  type ActivityInput,
+} from "../src/activity.ts";
 
 const base: ActivityInput = {
   commitTimes: [],
@@ -12,13 +19,24 @@ const base: ActivityInput = {
   days: 7,
 };
 
-const pr = (number: number, mergedAt: string | null) => ({
+const pr = (number: number, mergedAt: string | null, createdAt = "2026-11-10T00:00:00Z") => ({
   number,
   title: `pr ${number}`,
   state: mergedAt ? ("MERGED" as const) : ("OPEN" as const),
   url: `https://example.com/${number}`,
-  createdAt: "2026-11-10T00:00:00Z",
+  createdAt,
   mergedAt,
+  additions: 3,
+  deletions: 1,
+  statusCheckRollup: [{ status: "COMPLETED", conclusion: "SUCCESS" }],
+});
+
+const status = (subject: string, at: string, to: string): ActivityEvent => ({
+  at,
+  actor: "ai",
+  kind: "task.changed",
+  subject,
+  data: { changes: { status: { from: "x", to } } },
 });
 
 test("日付と時台は、指定したタイムゾーンで数える", () => {
@@ -64,12 +82,24 @@ test("完了したタスクは、done になった変更と、done で作られ�
   const a = summarizeActivity({
     ...base,
     events: [
-      { at, actor: "ai", kind: "task.changed", data: { changes: { status: { from: "doing", to: "done" } } } },
-      { at, actor: "ai", kind: "task.changed", data: { changes: { status: { from: "todo", to: "doing" } } } },
-      { at, actor: null, kind: "task.created", data: { task: { status: "done" } } },
-      { at, actor: "user", kind: "task.created", data: { task: { status: "todo" } } },
-      { at, actor: "user", kind: "task.noted", data: { note: { text: "x" } } },
-      { at, actor: "ai", kind: "lesson.created", data: {} },
+      {
+        at,
+        subject: "T-001",
+        actor: "ai",
+        kind: "task.changed",
+        data: { changes: { status: { from: "doing", to: "done" } } },
+      },
+      {
+        at,
+        subject: "T-001",
+        actor: "ai",
+        kind: "task.changed",
+        data: { changes: { status: { from: "todo", to: "doing" } } },
+      },
+      { at, subject: "T-001", actor: null, kind: "task.created", data: { task: { status: "done" } } },
+      { at, subject: "T-001", actor: "user", kind: "task.created", data: { task: { status: "todo" } } },
+      { at, subject: "T-001", actor: "user", kind: "task.noted", data: { note: { text: "x" } } },
+      { at, subject: "T-001", actor: "ai", kind: "lesson.created", data: {} },
     ],
   });
   assert.equal(a.totals.tasksDone, 2);
@@ -83,4 +113,81 @@ test("記録が無くても、期間の日付は空の行で埋める", () => {
   assert.equal(a.daily.length, 30);
   assert.ok(a.daily.every((d) => d.commits === 0 && d.prMerged === 0 && d.tasksDone === 0));
   assert.equal(a.heatmap.tasksDone.flat().length, 7 * 24);
+});
+
+test("CI の結果は、失敗が 1 つでもあれば失敗、すべて通れば成功、それ以外は実行中", () => {
+  assert.equal(checkResult([]), null);
+  assert.equal(checkResult(null), null);
+  assert.equal(checkResult([{ conclusion: "SUCCESS" }, { state: "SUCCESS" }, { conclusion: "SKIPPED" }]), "success");
+  assert.equal(checkResult([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "failure");
+  assert.equal(checkResult([{ status: "IN_PROGRESS", conclusion: "" }]), "pending");
+  assert.equal(checkResult([{ state: "PENDING" }]), "pending");
+});
+
+test("着手から完了までは、最初の doing から done までを測り、やり直したら次の doing から数える", () => {
+  const leads = leadTimes([
+    status("T-1", "2026-11-13T00:00:00Z", "doing"),
+    status("T-1", "2026-11-13T01:00:00Z", "blocked"),
+    status("T-1", "2026-11-13T02:00:00Z", "doing"),
+    status("T-1", "2026-11-13T03:00:00Z", "done"),
+    status("T-1", "2026-11-13T04:00:00Z", "doing"),
+    status("T-1", "2026-11-13T04:30:00Z", "done"),
+    status("T-2", "2026-11-13T00:00:00Z", "done"),
+  ]);
+  assert.deepEqual(
+    leads.map((l) => l.ms / 60_000),
+    [180, 30],
+  );
+});
+
+test("期間の中央値と、期間に作ったかマージした PR を新しい順に返す", () => {
+  const a = summarizeActivity({
+    ...base,
+    events: [
+      status("T-1", "2026-11-13T00:00:00Z", "doing"),
+      status("T-1", "2026-11-13T01:00:00Z", "done"),
+      status("T-2", "2026-11-13T00:00:00Z", "doing"),
+      status("T-2", "2026-11-13T03:00:00Z", "done"),
+      status("T-3", "2026-10-01T00:00:00Z", "doing"),
+      status("T-3", "2026-10-01T09:00:00Z", "done"),
+    ],
+    pullRequests: [
+      pr(1, "2026-10-01T01:00:00Z", "2026-10-01T00:00:00Z"),
+      pr(2, "2026-11-12T00:30:00Z", "2026-11-01T00:00:00Z"),
+      pr(3, null, "2026-11-13T00:00:00Z"),
+    ],
+  });
+  assert.deepEqual(a.leadTime, { count: 2, medianMs: 2 * 3_600_000 });
+  assert.deepEqual(
+    a.pullRequests.map((p) => [p.number, p.checks, p.mergeMs]),
+    [
+      [3, "success", null],
+      [2, "success", 11 * 86_400_000 + 1_800_000],
+    ],
+  );
+});
+
+test("マイルストーンごとに完了・中止・残りを数え、どれにも属さないタスクは別の行にする", () => {
+  const { rows, total } = milestoneProgress(
+    [
+      { id: "M0", title: "a", status: "active" },
+      { id: "M1", title: "b", status: "planned" },
+    ],
+    [
+      { milestone: "M0", status: "done" },
+      { milestone: "M0", status: "cancelled" },
+      { milestone: "M0", status: "doing" },
+      { milestone: null, status: "todo" },
+      { milestone: "M9", status: "done" },
+    ],
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.id, r.total, r.done, r.cancelled, r.open]),
+    [
+      ["M0", 3, 1, 1, 1],
+      ["M1", 0, 0, 0, 0],
+      [null, 2, 1, 0, 1],
+    ],
+  );
+  assert.deepEqual([total.total, total.done, total.cancelled, total.open], [5, 2, 1, 2]);
 });

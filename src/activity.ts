@@ -3,7 +3,13 @@
 
 import { z } from "zod";
 
-// gh pr list --json の出力のうち、使う項目
+// gh pr list --json の出力のうち、使う項目。CI の結果は、チェックの実行（status・conclusion）と
+// コミットの状態（state）のどちらでも来る
+const Check = z.looseObject({
+  status: z.string().optional(),
+  conclusion: z.string().nullable().optional(),
+  state: z.string().optional(),
+});
 export const PullRequest = z.object({
   number: z.number(),
   title: z.string(),
@@ -11,11 +17,15 @@ export const PullRequest = z.object({
   url: z.string(),
   createdAt: z.string(),
   mergedAt: z.string().nullable(),
+  additions: z.number(),
+  deletions: z.number(),
+  statusCheckRollup: z.array(Check).nullable().default([]),
 });
 export type PullRequest = z.infer<typeof PullRequest>;
+export const PR_FIELDS = Object.keys(PullRequest.shape).join(",");
 
 // 集計に使うボードのイベント。board-db の BoardEvent のうち、数えるのに要る項目だけ
-export type ActivityEvent = { at: string; actor: string | null; kind: string; data: unknown };
+export type ActivityEvent = { at: string; actor: string | null; kind: string; subject: string; data: unknown };
 
 export type Metric = "commits" | "prMerged" | "tasksDone";
 
@@ -49,7 +59,14 @@ export type Activity = {
   daily: ({ date: string } & Record<Metric, number>)[];
   // 曜日（月曜が 0）× 時台（0〜23）の件数
   heatmap: Record<Metric, number[][]>;
+  // 期間に完了したタスクの、着手（doing）から完了（done）までの時間。着手を通らずに完了したものは数えない
+  leadTime: { count: number; medianMs: number | null };
+  // 期間に作ったか、マージした PR。新しい順
+  pullRequests: PullRequestRow[];
 };
+
+export type CheckResult = "success" | "failure" | "pending" | null;
+export type PullRequestRow = Omit<PullRequest, "statusCheckRollup"> & { checks: CheckResult; mergeMs: number | null };
 
 type LocalTime = { date: string; hour: number };
 
@@ -81,6 +98,42 @@ function isTaskDone(event: ActivityEvent): boolean {
   if (event.kind === "task.created") return CreatedDone.safeParse(event.data).success;
   if (event.kind === "task.changed") return ChangedToDone.safeParse(event.data).success;
   return false;
+}
+
+const FAILED = ["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "ERROR", "STARTUP_FAILURE"];
+const PASSED = ["SUCCESS", "NEUTRAL", "SKIPPED"];
+
+export function checkResult(checks: PullRequest["statusCheckRollup"]): CheckResult {
+  if (!checks?.length) return null;
+  const results = checks.map((c) => c.conclusion ?? c.state ?? "");
+  if (results.some((r) => FAILED.includes(r))) return "failure";
+  return results.every((r) => PASSED.includes(r)) ? "success" : "pending";
+}
+
+const StatusTo = z.object({ changes: z.object({ status: z.object({ to: z.string() }) }) });
+
+// 着手してから完了するまで。完了のあとにやり直したタスクは、次の着手から数え直す
+export function leadTimes(events: ActivityEvent[]): { doneAt: string; ms: number }[] {
+  const started = new Map<string, string>();
+  const result: { doneAt: string; ms: number }[] = [];
+  for (const e of events) {
+    if (e.kind !== "task.changed") continue;
+    const to = StatusTo.safeParse(e.data);
+    if (!to.success) continue;
+    const status = to.data.changes.status.to;
+    const start = started.get(e.subject);
+    if (status === "doing" && !start) started.set(e.subject, e.at);
+    if (status === "done" && start) result.push({ doneAt: e.at, ms: Date.parse(e.at) - Date.parse(start) });
+    if (status === "done" || status === "cancelled") started.delete(e.subject);
+  }
+  return result;
+}
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = values.toSorted((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 export function summarizeActivity(input: ActivityInput): Activity {
@@ -139,11 +192,63 @@ export function summarizeActivity(input: ActivityInput): Activity {
     return cells;
   };
 
+  const leads = leadTimes(input.events)
+    .filter((l) => inRange(local(l.doneAt).date))
+    .map((l) => l.ms);
+
+  const pullRequests = input.pullRequests
+    .filter((pr) => inRange(local(pr.createdAt).date) || (pr.mergedAt !== null && inRange(local(pr.mergedAt).date)))
+    .toSorted((a, b) => b.number - a.number)
+    .map(({ statusCheckRollup, ...pr }) => ({
+      ...pr,
+      checks: checkResult(statusCheckRollup),
+      mergeMs: pr.mergedAt ? Date.parse(pr.mergedAt) - Date.parse(pr.createdAt) : null,
+    }));
+
   return {
     range: { days: input.days, from, to, timeZone: input.timeZone },
     totals: totalsIn(inRange),
     previous: input.days > 0 ? totalsIn(within(addDays(from, -input.days), addDays(from, -1))) : null,
     daily,
     heatmap: { commits: grid("commits"), prMerged: grid("prMerged"), tasksDone: grid("tasksDone") },
+    leadTime: { count: leads.length, medianMs: median(leads) },
+    pullRequests,
   };
+}
+
+// ---- マイルストーンの進み（期間に関係なく、いまの状態） ----
+
+type TaskState = { milestone: string | null; status: string };
+type MilestoneRef = { id: string; title: string; status: string };
+export type MilestoneRow = {
+  id: string | null;
+  title: string;
+  status: string | null;
+  total: number;
+  done: number;
+  cancelled: number;
+  open: number;
+};
+
+export function milestoneProgress(
+  milestones: MilestoneRef[],
+  tasks: TaskState[],
+): { rows: MilestoneRow[]; total: MilestoneRow } {
+  const row = (id: string | null, title: string, status: string | null, mine: TaskState[]): MilestoneRow => {
+    const done = mine.filter((t) => t.status === "done").length;
+    const cancelled = mine.filter((t) => t.status === "cancelled").length;
+    return { id, title, status, total: mine.length, done, cancelled, open: mine.length - done - cancelled };
+  };
+  const rows = milestones.map((m) =>
+    row(
+      m.id,
+      m.title,
+      m.status,
+      tasks.filter((t) => t.milestone === m.id),
+    ),
+  );
+  const known = new Set(milestones.map((m) => m.id));
+  const unassigned = tasks.filter((t) => !t.milestone || !known.has(t.milestone));
+  if (unassigned.length) rows.push(row(null, "マイルストーンなし", null, unassigned));
+  return { rows, total: row(null, "合計", null, tasks) };
 }
