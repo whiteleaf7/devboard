@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withLock } from "../src/lock.ts";
 
-const root = mkdtempSync(join(tmpdir(), "nagaya-lock-"));
+const root = mkdtempSync(join(tmpdir(), "autodev-lock-"));
 after(() => rmSync(root, { recursive: true, force: true }));
 let count = 0;
 const lockDir = () => join(root, `lock-${++count}`);

@@ -1,4 +1,4 @@
-// nagaya 開発用の MCP サーバ（stdio）。.mcp.json から nagaya-dev として登録している。
+// 開発用の MCP サーバ（stdio）。.mcp.json や .codex/config.toml から devboard として登録している。
 // タスク・マイルストーン・決定記録を読み書きする。データはダッシュボードと共有（store.ts）。
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -8,13 +8,8 @@ import {
   TaskStatus,
   TaskCreateInput,
   TaskUpdateInput,
-  nextTasks,
-  describeTasks,
   DECISION_STATUSES,
-  snapshot,
   readTasks,
-  getTask,
-  taskHistory,
   createTask,
   updateTask,
   readDecisions,
@@ -25,12 +20,13 @@ import {
   LessonInput,
   createLesson,
   readLessons,
+  readProject,
 } from "./store.ts";
 import { ensureServer } from "./launcher.ts";
-import { boardProblems } from "./lint.ts";
+import { boardGetDecision, boardGetTask, boardListDecisions, boardListTasks, boardOverview } from "./queries.ts";
 import { buildDocs, recall } from "./recall.ts";
 
-const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッションを管理するデスクトップアプリ）の開発ボード。
+const INSTRUCTIONS = `${readProject().name} の開発ボード。
 作業を始めるときは get_overview で現在のマイルストーン、進行中のタスク、次に着手できるタスク（next）、進められないタスク（stuck）を確認する。
 「未着手をすべて進めて」のような一括の依頼は、list_tasks(status: "todo") で全体を見て、ready のものを order の順に進め、1 件終わるたびに list_tasks を取り直す。ready が 0 件になったら終える。stuck のものは理由を添えてユーザーに返す。
 ユーザーの大まかな依頼は、依頼そのものを親タスクとして登録し（説明に依頼文をそのまま残す）、1 セッションで終わる大きさの子タスク（parent）に分ける。順番があるものは dependsOn でつなぐ。
@@ -41,7 +37,7 @@ const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッション
 設計上の判断をしたら create_decision で docs/decisions/ に記録する（後から覆すときは新しい記録を作り、古い方を「置き換え」にする）。
 ユーザーに見せたいときは、pnpm board:tailscale を実行して出力された Tailscale の URL を返す（ユーザーは別の端末から開く。ブラウザで開くのはユーザー）。Tailscale が動いていないときだけ open_dashboard のローカルの URL を返し、理由を添える。`;
 
-const server = new McpServer({ name: "nagaya-dev", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+const server = new McpServer({ name: "devboard", version: "0.1.0" }, { instructions: INSTRUCTIONS });
 
 const json = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -61,40 +57,7 @@ server.registerTool(
       "マイルストーン、状態ごとのタスク数、進行中・ブロック中のタスク、最近の決定記録、git の状態をまとめて返す。git.uncommittedDecisions は main の worktree に残った未コミットの決定記録（作業者が書いたもの。司令塔が自分のブランチに移して取り込む）",
     annotations: { readOnlyHint: true },
   },
-  () =>
-    tool(() => {
-      const s = snapshot();
-      const count = Object.fromEntries(
-        TaskStatus.options.map((st) => [st, s.tasks.filter((t) => t.status === st).length]),
-      );
-      const pick = (st: string) =>
-        s.tasks
-          .filter((t) => t.status === st)
-          .map((t) => ({ id: t.id, title: t.title, milestone: t.milestone, branch: t.branch }));
-      return {
-        project: { name: s.project.name, summary: s.project.summary },
-        milestones: s.project.milestones.map((m) => ({
-          ...m,
-          tasks: s.tasks.filter((t) => t.milestone === m.id).length,
-          done: s.tasks.filter((t) => t.milestone === m.id && t.status === "done").length,
-        })),
-        count,
-        doing: pick("doing"),
-        blocked: pick("blocked"),
-        review: pick("review"),
-        next: nextTasks(s.tasks)
-          .slice(0, 5)
-          .map((t) => ({ id: t.id, title: t.title, priority: t.priority, parent: t.parent, milestone: t.milestone })),
-        stuck: s.tasks.filter((t) => t.stuck).map((t) => ({ id: t.id, title: t.title, reason: t.stuck })),
-        closable: s.tasks.filter((t) => t.closable).map((t) => ({ id: t.id, title: t.title })),
-        recentDecisions: s.decisions
-          .slice(-5)
-          .map(({ number, title, status, date }) => ({ number, title, status, date })),
-        git: s.git,
-        errors: s.errors,
-        problems: boardProblems(),
-      };
-    }),
+  () => tool(() => boardOverview()),
 );
 
 server.registerTool(
@@ -116,31 +79,7 @@ server.registerTool(
     },
     annotations: { readOnlyHint: true },
   },
-  ({ status, ready, milestone, label, parent, detail }) =>
-    tool(() => {
-      const { tasks, errors } = readTasks();
-      const statuses = status === undefined ? null : Array.isArray(status) ? status : [status];
-      const items = describeTasks(tasks)
-        .filter(
-          (t) =>
-            (!statuses || statuses.includes(t.status)) &&
-            (ready === undefined || t.ready === ready) &&
-            (!milestone || t.milestone === milestone) &&
-            (!label || t.labels.includes(label)) &&
-            (!parent || t.parent === parent),
-        )
-        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id))
-        .map(({ notes, description, created, createdBy, ...t }) =>
-          detail ? { ...t, createdBy, description, lastNote: notes.at(-1) ?? null } : { ...t, createdBy },
-        );
-      const summary = {
-        total: items.length,
-        ready: items.filter((t) => t.ready).length,
-        stuck: items.filter((t) => t.stuck).length,
-        closable: items.filter((t) => t.closable).length,
-      };
-      return errors.length ? { summary, tasks: items, errors } : { summary, tasks: items };
-    }),
+  (filter) => tool(() => boardListTasks(filter)),
 );
 
 server.registerTool(
@@ -151,20 +90,7 @@ server.registerTool(
     inputSchema: { id: z.string().describe("例: T-001") },
     annotations: { readOnlyHint: true },
   },
-  ({ id }) =>
-    tool(() => {
-      const task = getTask(id);
-      const children = readTasks()
-        .tasks.filter((t) => t.parent === id)
-        .map(({ id, title, status }) => ({ id, title, status }));
-      const history = taskHistory(id).map(({ at, actor, kind, data }) => ({
-        at,
-        by: actor,
-        kind,
-        ...(typeof data === "object" && data !== null ? data : {}),
-      }));
-      return { ...task, children, history: history.filter((e) => e.kind !== "task.noted") };
-    }),
+  ({ id }) => tool(() => boardGetTask(id)),
 );
 
 server.registerTool(
@@ -201,8 +127,7 @@ server.registerTool(
     description: "決定記録（docs/decisions/）の一覧",
     annotations: { readOnlyHint: true },
   },
-  () =>
-    tool(() => readDecisions().map(({ number, title, status, date, file }) => ({ number, title, status, date, file }))),
+  () => tool(() => boardListDecisions()),
 );
 
 server.registerTool(
@@ -212,12 +137,7 @@ server.registerTool(
     inputSchema: { number: z.number().int().positive() },
     annotations: { readOnlyHint: true },
   },
-  ({ number }) =>
-    tool(() => {
-      const d = readDecisions().find((x) => x.number === number);
-      if (!d) throw new Error(`決定記録 ${number} は存在しない`);
-      return d;
-    }),
+  ({ number }) => tool(() => boardGetDecision(number)),
 );
 
 server.registerTool(

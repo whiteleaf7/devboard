@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f5f2">
 <script src="/theme.js"></script>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>活動 · nagaya devboard</title>
+<title>活動 · devboard</title>
 <link rel="stylesheet" href="/base.css">
 <style>
   /* グラフの色。1 系列の青と、量を表す青の段階（ヒートマップ）。ダークは暗い面に合わせた段を選ぶ */
@@ -126,7 +126,7 @@
 </head>
 <body>
 <header>
-  <h1>nagaya</h1>
+  <h1 id="name">devboard</h1>
   <nav class="pages" aria-label="画面"><a href="/">ボード</a><a href="/activity" aria-current="page">活動</a></nav>
   <span class="spacer"></span>
   <span class="live" id="live" title="変更を監視中"></span>
@@ -580,6 +580,10 @@ function renderSummary() {
 
 function render() {
   if (!data) return;
+  if (data.projectName) {
+    $("name").textContent = data.projectName;
+    document.title = `活動 · ${data.projectName} devboard`;
+  }
   $("errors").textContent = data.sources.pullRequests ?? "";
   renderSummary();
   renderMilestones();

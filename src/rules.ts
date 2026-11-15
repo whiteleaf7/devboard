@@ -120,9 +120,9 @@ const UNVERIFIED =
   "振る舞いを変えるタスク（paths か、`Task:` の行でこのタスクを指したコミットに docs 以外がある）は、" +
   "実際に動かした結果をメモに残してから done にする。" +
   "テスト・型チェック・lint・ビルドだけでは足りない。note に「動かした: `コマンド` → 結果」の行を書く" +
-  "（例: 動かした: `pnpm --filter @nagaya/verify screenshot <URL> .dev/verify/board.png --wait-for <セレクタ>` → 一覧に 3 件出た）。" +
+  "（例: 動かした: `pnpm --filter @repo/verify screenshot <URL> .dev/verify/board.png --wait-for <セレクタ>` → 一覧に 3 件出た）。" +
   "手段は docs/verification.md の「使える手段」: 画面は screenshot、ネイティブのウィンドウは windows、" +
-  "CLI やサーバは起動して出力を見る、ボードの操作は NAGAYA_BOARD の写しに pnpm board:apply";
+  "CLI やサーバは起動して出力を見る、ボードの操作は DEVBOARD_DB の写しに pnpm board:apply";
 
 // この変更で done になったタスクのうち、動かした結果の無いもの。
 // 振る舞いを変えたかは、予定（paths）と、コミットが実際に変えたファイル（committedFiles）の両方で見る。paths を書かずに閉じても抜けられないように

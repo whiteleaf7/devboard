@@ -8,7 +8,7 @@
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
 // 読み取り専用。ボードへの書き込みは MCP と `pnpm board:apply` だけが行う（決定記録 0038）。
 // tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host に許可する。
-// 許可する名前は起動時に `tailscale status` から取る。NAGAYA_DEV_HOSTS（カンマ区切り）で足せる。
+// 許可する名前は起動時に `tailscale status` から取る。DEVBOARD_HOSTS（カンマ区切り）で足せる。
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
@@ -31,7 +31,7 @@ const asset = (name: string) => readFileSync(join(import.meta.dirname, "..", "pu
 const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
 export function remoteHosts(): string[] {
-  const extra = (process.env.NAGAYA_DEV_HOSTS ?? "")
+  const extra = (process.env.DEVBOARD_HOSTS ?? process.env.NAGAYA_DEV_HOSTS ?? "")
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean);
@@ -65,7 +65,10 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
 }
 
 // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
-export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT_PORT), remote = remoteHosts()) {
+export function startServer(
+  port = Number(process.env.DEVBOARD_PORT ?? process.env.NAGAYA_DEV_PORT ?? DEFAULT_PORT),
+  remote = remoteHosts(),
+) {
   const clients = new Set<ServerResponse>();
   let timer: NodeJS.Timeout | undefined;
 
@@ -142,7 +145,7 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
     const url = `http://127.0.0.1:${port}/`;
     mkdirSync(join(repoRoot(), ".dev"), { recursive: true });
     writeFileSync(instanceFile(), JSON.stringify({ url, pid: process.pid }) + "\n");
-    console.log(`nagaya devboard: ${url}`);
+    console.log(`devboard: ${url}`);
     if (remote.length) console.log(`許可している tailnet の名前: ${remote.join(", ")}`);
   });
 

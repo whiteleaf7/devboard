@@ -70,8 +70,8 @@ test("変更で新しく増えた問題だけを返す", () => {
 
 test("動かしたコマンドと結果の行だけを、動かした証拠とみなす", () => {
   const ran = [
-    "動かした: `pnpm --filter @nagaya/verify screenshot http://127.0.0.1:5173/ .dev/verify/a.png --wait-for .card` → 一覧に 3 件出た",
-    "修正した。\n- 動かした：`NAGAYA_BOARD=/tmp/b.sqlite pnpm board:apply '[]'` -> `{\"ids\":[]}`",
+    "動かした: `pnpm --filter @repo/verify screenshot http://127.0.0.1:5173/ .dev/verify/a.png --wait-for .card` → 一覧に 3 件出た",
+    "修正した。\n- 動かした：`DEVBOARD_DB=/tmp/b.sqlite pnpm board:apply '[]'` -> `{\"ids\":[]}`",
     "動かした: `pnpm test` → 通った\n動かした: `pnpm harness:selftest` → 45/45",
     "動かした: `node tools/x.ts a->b` → 出力が 2 行",
     "動かした: `./scripts/smoke.sh` → 通った",
@@ -81,7 +81,7 @@ test("動かしたコマンドと結果の行だけを、動かした証拠と�
     "テストで確かめた",
     "pnpm test と pnpm typecheck が通った",
     "動かした: `pnpm test` → 120 件通った",
-    "動かした: `pnpm --filter @nagaya/devboard typecheck` → エラー無し",
+    "動かした: `pnpm --filter @repo/devboard typecheck` → エラー無し",
     "動かした: `node --test test/` → 通った",
     "動かした: `CI=1 pnpm run lint` → 0 件",
     "動かした: `bun test` → 通った",

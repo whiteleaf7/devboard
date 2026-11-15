@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export function useTempBoard(name: string): string {
-  const root = mkdtempSync(join(tmpdir(), `nagaya-${name}-`));
+  const root = mkdtempSync(join(tmpdir(), `autodev-${name}-`));
   after(() => rmSync(root, { recursive: true, force: true }));
-  process.env.NAGAYA_ROOT = root;
-  process.env.NAGAYA_BOARD = join(root, "board.sqlite");
+  process.env.DEVBOARD_ROOT = root;
+  process.env.DEVBOARD_DB = join(root, "board.sqlite");
   return root;
 }

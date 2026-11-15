@@ -3,8 +3,22 @@
 // 文字列の "$N" は、N 番目（0 始まり）の操作が作ったものの ID に置き換える（例: 親を作ってから子を作る）
 
 import { z } from "zod";
-import { createLesson, createTask, setMilestone, updateTask } from "./store.ts";
-import { LessonInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
+import { createDecision, createLesson, createTask, setDecisionStatus, setMilestone, updateTask } from "./store.ts";
+import { DECISION_STATUSES, LessonInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
+
+const DecisionCreateInput = z.strictObject({
+  title: z.string().min(1),
+  slug: z.string().min(1),
+  status: z.enum(DECISION_STATUSES).optional(),
+  context: z.string(),
+  decision: z.string(),
+  consequences: z.string(),
+});
+
+const DecisionStatusInput = z.strictObject({
+  number: z.number().int().positive(),
+  status: z.enum(DECISION_STATUSES),
+});
 
 // 知らない項目は黙って落とさずに断る
 export const BoardOp = z.discriminatedUnion("op", [
@@ -12,6 +26,8 @@ export const BoardOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("update_task"), args: TaskUpdateInput.extend({ id: z.string() }).strict() }),
   z.strictObject({ op: z.literal("add_lesson"), args: LessonInput.strict() }),
   z.strictObject({ op: z.literal("set_milestone"), args: MilestoneInput.strict() }),
+  z.strictObject({ op: z.literal("create_decision"), args: DecisionCreateInput }),
+  z.strictObject({ op: z.literal("set_decision_status"), args: DecisionStatusInput }),
 ]);
 export type BoardOp = z.infer<typeof BoardOp>;
 
@@ -36,6 +52,10 @@ function applyOne(op: BoardOp): string {
     case "set_milestone":
       setMilestone(op.args);
       return op.args.id;
+    case "create_decision":
+      return `D-${String(createDecision(op.args).number).padStart(4, "0")}`;
+    case "set_decision_status":
+      return `D-${String(setDecisionStatus(op.args.number, op.args.status).number).padStart(4, "0")}`;
   }
 }
 

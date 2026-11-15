@@ -15,7 +15,7 @@ for (const name of Object.keys(process.env)) if (name.startsWith("GIT_")) delete
 const store = join(import.meta.dirname, "..", "src", "store.ts");
 
 test("linked worktree の中からでも、main の worktree をボードの根にする", (t) => {
-  const main = realpathSync(mkdtempSync(join(tmpdir(), "nagaya-main-")));
+  const main = realpathSync(mkdtempSync(join(tmpdir(), "autodev-main-")));
   t.after(() => rmSync(main, { recursive: true, force: true }));
   const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, stdio: "ignore" });
   git(main, "init", "-q", "-b", "main");
@@ -38,7 +38,7 @@ test("linked worktree の中からでも、main の worktree をボードの根�
 
   assert.equal(mainWorktreeOf(linked), main);
   assert.equal(mainWorktreeOf(main), main);
-  const plain = mkdtempSync(join(tmpdir(), "nagaya-plain-"));
+  const plain = mkdtempSync(join(tmpdir(), "autodev-plain-"));
   t.after(() => rmSync(plain, { recursive: true, force: true }));
   assert.equal(mainWorktreeOf(plain), plain, "git の管理下でなければ、そのまま");
 
@@ -51,7 +51,7 @@ test("linked worktree の中からでも、main の worktree をボードの根�
 });
 
 test("複数のプロセスが同時に作っても、番号が重ならず、どれも消えず、イベントがそろう", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "nagaya-parallel-"));
+  const root = mkdtempSync(join(tmpdir(), "autodev-parallel-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const boardFile = join(root, "board.sqlite");
   const script = `
@@ -64,7 +64,7 @@ test("複数のプロセスが同時に作っても、番号が重ならず、�
   await Promise.all(
     Array.from({ length: 4 }, () =>
       run(process.execPath, ["--input-type=module", "-e", script], {
-        env: { ...process.env, NAGAYA_ROOT: root, NAGAYA_BOARD: boardFile },
+        env: { ...process.env, DEVBOARD_ROOT: root, DEVBOARD_DB: boardFile },
       }),
     ),
   );

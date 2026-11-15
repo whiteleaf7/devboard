@@ -8,7 +8,7 @@ import { request, type IncomingHttpHeaders } from "node:http";
 import { useTempBoard } from "./temp-board.ts";
 
 const root = useTempBoard("devboard-server-details");
-process.env.NAGAYA_DEV_HOSTS = " extra.example.ts.net , ,second.example.ts.net";
+process.env.DEVBOARD_HOSTS = " extra.example.ts.net , ,second.example.ts.net";
 mkdirSync(join(root, "docs", "decisions"), { recursive: true });
 const store = await import("../src/store.ts");
 store.updateProject(() => ({ name: "t", summary: "", milestones: [] }));

@@ -4,13 +4,13 @@
 //   pnpm board:tailscale       ダッシュボードを起動し、tailscale serve で公開して URL を出す
 //   pnpm board:tailscale off   公開をやめる（ダッシュボードは止めない）
 //
-// 既存の serve 設定を壊さないよう、専用の HTTPS ポート（既定 8448、NAGAYA_DEV_TS_PORT で変更）だけを使う。
+// 既存の serve 設定を壊さないよう、専用の HTTPS ポート（既定 8448、DEVBOARD_TS_PORT で変更）だけを使う。
 
 import { execFileSync } from "node:child_process";
 import { tailscaleCli, tailnetName } from "./tailnet.ts";
 
 // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
-export const tsPort = () => Number(process.env.NAGAYA_DEV_TS_PORT ?? 8448);
+export const tsPort = () => Number(process.env.DEVBOARD_TS_PORT ?? process.env.NAGAYA_DEV_TS_PORT ?? 8448);
 
 if (import.meta.main) {
   const cli = tailscaleCli();

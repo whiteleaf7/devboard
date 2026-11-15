@@ -23,7 +23,7 @@ const lesson = { id: "L-001", title: "教訓", problem: "起きた", fix: "直�
 const project = { name: "p", summary: "要約", milestones: [] };
 
 function makeRepo(): { root: string; write: (path: string, value: unknown) => void; commit: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "nagaya-board-import-"));
+  const root = mkdtempSync(join(tmpdir(), "autodev-board-import-"));
   after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env, stdio: "ignore" });
   git("init", "-q");
@@ -43,7 +43,7 @@ function makeRepo(): { root: string; write: (path: string, value: unknown) => vo
 function importBoard(root: string) {
   const file = join(root, "board.sqlite");
   const result = spawnSync("node", [SCRIPT], {
-    env: { ...env, NAGAYA_ROOT: root, NAGAYA_BOARD: file },
+    env: { ...env, DEVBOARD_ROOT: root, DEVBOARD_DB: file },
     encoding: "utf8",
   });
   const rows = (table: string) => {

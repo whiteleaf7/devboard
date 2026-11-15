@@ -1,7 +1,7 @@
 // ボードの保存先（決定記録 0011）。git の外の SQLite に、変更をイベントとして追記し、いまの状態の表を同じトランザクションで更新する。
 // どの worktree から使っても同じファイルを読み書きする。
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
@@ -30,12 +30,13 @@ const SCHEMA = `
 export function boardFile(): string {
   // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
   // pnpm --filter はパッケージのディレクトリで動くので、相対パスは呼び出したディレクトリ（INIT_CWD）から解決する
-  if (process.env.NAGAYA_BOARD) return resolve(process.env.INIT_CWD ?? process.cwd(), process.env.NAGAYA_BOARD);
+  const explicit = process.env.DEVBOARD_DB || process.env.NAGAYA_BOARD;
+  if (explicit) return resolve(process.env.INIT_CWD ?? process.cwd(), explicit);
   // node --test の中から本物のボードに書かないように止める
   if (process.env.NODE_TEST_CONTEXT)
-    throw new Error("テストでは NAGAYA_BOARD に一時ファイルを指定する（本物のボードに書かないため）");
+    throw new Error("テストでは DEVBOARD_DB に一時ファイルを指定する（本物のボードに書かないため）");
   const main = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
-  return join(homedir(), ".nagaya-dev", "boards", `${basename(main)}.sqlite`);
+  return join(homedir(), ".devboard", "boards", `${basename(main)}.sqlite`);
 }
 
 // WAL への切り替えは、待ち時間の設定が効かずにすぐ SQLITE_BUSY を返すことがある（新しいファイルを複数のプロセスが同時に開いたとき）
@@ -54,12 +55,23 @@ function whenUnlocked(fn: () => void): void {
 
 const opened = new Map<string, DatabaseSync>();
 
-// テストは NAGAYA_BOARD を変えて別のボードを使うので、ファイルごとに開いておく
+// テストは DEVBOARD_DB を変えて別のボードを使うので、ファイルごとに開いておく
 export function board(): DatabaseSync {
   const file = boardFile();
   const existing = opened.get(file);
   if (existing) return existing;
   mkdirSync(dirname(file), { recursive: true });
+  if (!existsSync(file) && !process.env.DEVBOARD_DB && !process.env.NAGAYA_BOARD) {
+    const legacy = join(homedir(), ".nagaya-dev", "boards", basename(file));
+    if (existsSync(legacy)) {
+      const src = new DatabaseSync(legacy, { readOnly: true, timeout: BUSY_TIMEOUT_MS });
+      try {
+        src.exec(`VACUUM INTO '${file.replaceAll("'", "''")}'`);
+      } finally {
+        src.close();
+      }
+    }
+  }
   const db = new DatabaseSync(file, { timeout: BUSY_TIMEOUT_MS });
   whenUnlocked(() => db.exec("PRAGMA journal_mode = WAL"));
   if ((db.prepare("PRAGMA user_version").get()?.user_version ?? 0) === 0) {

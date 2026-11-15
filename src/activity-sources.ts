@@ -56,6 +56,7 @@ async function readPullRequests(): Promise<PullRequests> {
 }
 
 export type ActivityResponse = Activity & {
+  projectName: string;
   milestones: ReturnType<typeof milestoneProgress>;
   // マイルストーンの ID ごとの依存関係の図
   dependencies: Record<string, DependencyGraph>;
@@ -75,10 +76,11 @@ export async function loadActivity(days: number, now = new Date()): Promise<Acti
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     days,
   });
-  const { milestones } = readProject();
+  const { name: projectName, milestones } = readProject();
   const { tasks } = readTasks();
   return {
     ...activity,
+    projectName,
     milestones: milestoneProgress(milestones, tasks),
     dependencies: Object.fromEntries(milestones.map((m) => [m.id, dependencyGraph(tasks, m.id)])),
     sources: { pullRequests: prs.error },

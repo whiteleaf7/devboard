@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tailnetName } from "../src/tailnet.ts";
 
-const bin = mkdtempSync(join(tmpdir(), "nagaya-tailnet-"));
+const bin = mkdtempSync(join(tmpdir(), "autodev-tailnet-"));
 const originalPath = process.env.PATH;
 process.env.PATH = `${bin}:${originalPath}`;
 after(() => {

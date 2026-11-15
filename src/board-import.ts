@@ -101,7 +101,7 @@ const db = board();
 const existing = Number(db.prepare("SELECT count(*) AS n FROM events").get()?.n);
 if (existing > 0) {
   console.error(
-    `board:import: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、NAGAYA_BOARD で別のファイルを指定する`,
+    `board:import: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、DEVBOARD_DB で別のファイルを指定する`,
   );
   process.exit(1);
 }

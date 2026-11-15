@@ -29,7 +29,7 @@ test("PR は gh から読み、続けて開いたときは gh を呼び直さな
 
 test("gh が無ければ、そう伝える", async () => {
   // 前のテストの読み取りを使い回さないよう、別のリポジトリの根にする
-  process.env.NAGAYA_ROOT = mkdtempSync(join(root, "other-"));
+  process.env.DEVBOARD_ROOT = mkdtempSync(join(root, "other-"));
   process.env.PATH = mkdtempSync(join(root, "empty-path-"));
   const activity = await loadActivity(7);
   assert.match(activity.sources.pullRequests ?? "", /gh が見つからない/);

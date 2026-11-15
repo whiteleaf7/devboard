@@ -21,7 +21,7 @@ const docs: RecallDoc[] = [
     id: "D-0005",
     kind: "decision",
     title: "保存: 会話は Claude の記録を読む",
-    body: "nagaya のメタデータは JSON ファイルで持つ。",
+    body: "autodev のメタデータは JSON ファイルで持つ。",
   },
   {
     id: "T-021",

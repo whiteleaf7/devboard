@@ -3,7 +3,7 @@
 
 /** @typedef {"light" | "dark"} Theme */
 
-const THEME_KEY = "nagaya-devboard-theme";
+const THEME_KEY = "devboard-theme";
 const THEME_COLOR = { light: "#f6f5f2", dark: "#1b1a18" };
 
 /** @param {Theme} theme */
