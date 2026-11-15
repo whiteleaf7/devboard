@@ -68,20 +68,19 @@ test("作成したタスクは既定値を持ち、ボードと作成のイベ�
     store.taskHistory(task.id).map((e) => [e.kind, e.actor, e.at]),
     [["task.created", "ai", task.created]],
   );
-  assert.equal(store.createTask({ title: "ユーザーから", createdBy: "user" }).createdBy, "user");
 });
 
 test("更新は渡した項目だけを変え、メモは前後の空白を落として追記する", async () => {
   const task = store.createTask({ title: "更新", priority: "high", labels: ["a"] });
   await new Promise((r) => setTimeout(r, 5));
-  const updated = store.updateTask(task.id, { status: "doing", note: "  着手した  ", by: "user" });
+  const updated = store.updateTask(task.id, { status: "doing", note: "  着手した  " });
   assert.deepEqual(
     [updated.priority, updated.labels, updated.title, updated.created],
     ["high", ["a"], "更新", task.created],
   );
   assert.deepEqual(
     updated.notes.map((n) => [n.text, n.by]),
-    [["着手した", "user"]],
+    [["着手した", "ai"]],
   );
   assert.ok(updated.updated > task.updated, "更新の時刻が進む");
   assert.equal(updated.notes[0]?.at, updated.updated);
@@ -89,22 +88,20 @@ test("更新は渡した項目だけを変え、メモは前後の空白を落�
   const again = store.updateTask(task.id, { note: "   ", labels: [] });
   assert.equal(again.notes.length, 1, "空白だけのメモは足さない");
   assert.deepEqual(again.labels, []);
-  assert.equal(store.updateTask(task.id, { note: "続き" }).notes.at(-1)?.by, "ai", "書いた人の既定は ai");
   assert.equal(store.updateTask(task.id, { milestone: null, parent: null }).milestone, null);
-  assert.throws(() => store.updateTask(task.id, { milestone: "M9", by: "user" }), /マイルストーン M9 はボードにない/);
-  // つながりの確かめは、決まりの検査を受けないユーザーの書き込みにもかける
-  assert.throws(() => store.updateTask(task.id, { dependsOn: [task.id], by: "user" }), /依存が循環する/);
-  assert.throws(() => store.updateTask(task.id, { parent: task.id, by: "user" }), /親子関係が循環する/);
-  assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"], by: "user" }), /タスク T-999 は存在しない/);
+  assert.throws(() => store.updateTask(task.id, { milestone: "M9" }), /マイルストーン M9 はボードにない/);
+  assert.throws(() => store.updateTask(task.id, { dependsOn: [task.id] }), /依存が循環する/);
+  assert.throws(() => store.updateTask(task.id, { parent: task.id }), /親子関係が循環する/);
+  assert.throws(() => store.updateTask(task.id, { dependsOn: ["T-999"] }), /タスク T-999 は存在しない/);
   assert.throws(() => store.getTask("T-999"), /T-999/);
 
   const history = store.taskHistory(task.id).map((e) => [e.kind, e.actor, e.data]);
   assert.deepEqual(
     history[1],
-    ["task.changed", "user", { changes: { status: { from: "todo", to: "doing" } } }],
+    ["task.changed", "ai", { changes: { status: { from: "todo", to: "doing" } } }],
     "誰が何をどう変えたか",
   );
-  assert.deepEqual(history[2]?.slice(0, 2), ["task.noted", "user"]);
+  assert.deepEqual(history[2]?.slice(0, 2), ["task.noted", "ai"]);
   assert.deepEqual(
     history[3],
     ["task.changed", "ai", { changes: { labels: { from: ["a"], to: [] } } }],
@@ -114,7 +111,7 @@ test("更新は渡した項目だけを変え、メモは前後の空白を落�
   assert.throws(() => board().prepare("DELETE FROM events").run(), /追記/, "イベントは消せない");
 });
 
-test("AI の書き込みは、ボードの決まりに新しく反するなら断る。ユーザーの書き込みは断らない", () => {
+test("書き込みは、ボードの決まりに新しく反するなら断る", () => {
   const parent = store.createTask({ title: "親" });
   const child = store.createTask({ title: "子", parent: parent.id });
   assert.throws(() => store.updateTask(child.id, { status: "done" }), /メモ/, "メモの無い done");
@@ -130,11 +127,6 @@ test("AI の書き込みは、ボードの決まりに新しく反するなら�
     "同じ呼び出しでメモを足せばよい",
   );
   assert.equal(store.updateTask(parent.id, { status: "done", note: "子が終わった" }).status, "done");
-  assert.equal(
-    store.updateTask(store.createTask({ title: "画面から" }).id, { status: "done", by: "user" }).status,
-    "done",
-    "ユーザーは断らない",
-  );
 
   const feature = store.createTask({ title: "振る舞いを変える", paths: ["tools/devboard/src/"] });
   assert.throws(
@@ -147,10 +139,11 @@ test("AI の書き込みは、ボードの決まりに新しく反するなら�
     "done",
   );
 
-  // ユーザーが壊した状態は、AI がほかの項目を変えても断らない（新しく増えた問題だけを止める）
-  const reopened = store.updateTask(child.id, { status: "todo", by: "user" });
+  // もとから壊れている状態（過去に画面から書かれたものなど）は、ほかの項目を変えても断らない（新しく増えた問題だけを止める）
+  board()
+    .prepare("UPDATE tasks SET data = ? WHERE id = ?")
+    .run(JSON.stringify({ ...store.getTask(child.id), status: "todo" }), child.id);
   assert.equal(store.updateTask(parent.id, { priority: "high" }).priority, "high");
-  assert.equal(reopened.status, "todo");
   store.createTask({ title: "M0 のもの", milestone: "M0" });
   assert.throws(
     () => store.updateProject((p) => ({ ...p, milestones: [] })),
@@ -327,6 +320,32 @@ test("知らない項目は、更新しても消さない（新しい版のコ�
   assert.deepEqual([saved.owner, saved.milestones[0].color], ["me", "red"]);
 });
 
+test("以前に画面から書かれたもの（user）は読めて、AI が更新しても書き手を書き換えない", () => {
+  const task = store.createTask({ title: "以前は画面から" });
+  const fromScreen = {
+    ...rawRow("tasks", task.id),
+    createdBy: "user",
+    notes: [{ at: "2026-11-12T00:00:00.000Z", text: "画面から書いた", by: "user" }],
+  };
+  board().prepare("UPDATE tasks SET data = ? WHERE id = ?").run(JSON.stringify(fromScreen), task.id);
+  assert.equal(store.getTask(task.id).createdBy, "user");
+
+  const updated = store.updateTask(task.id, { status: "doing", note: "AI が続けた" });
+  assert.equal(updated.createdBy, "user");
+  assert.deepEqual(
+    updated.notes.map((n) => n.by),
+    ["user", "ai"],
+  );
+  assert.deepEqual(
+    store
+      .taskHistory(task.id)
+      .slice(1)
+      .map((e) => e.actor),
+    ["ai", "ai"],
+    "いまの書き込みは ai として残る",
+  );
+});
+
 test("マイルストーンは、ID が無ければ足し、あれば渡した項目だけを変える", () => {
   const before = store.readProject().milestones.length;
   assert.throws(() => store.setMilestone({ id: "M8" }), /title が必要/);
@@ -347,5 +366,5 @@ test("依存をたどるとき、すでにある循環で止まらずに回り�
   insert("T-2001", 2001, ["T-2002"]);
   insert("T-2002", 2002, ["T-2001"]);
   const task = store.createTask({ title: "循環に依存する" });
-  assert.deepEqual(store.updateTask(task.id, { dependsOn: ["T-2001"], by: "user" }).dependsOn, ["T-2001"]);
+  assert.deepEqual(store.updateTask(task.id, { dependsOn: ["T-2001"] }).dependsOn, ["T-2001"]);
 });

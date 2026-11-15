@@ -35,7 +35,7 @@ const INSTRUCTIONS = `nagaya（Agent SDK でエージェントのセッション
 「未着手をすべて進めて」のような一括の依頼は、list_tasks(status: "todo") で全体を見て、ready のものを order の順に進め、1 件終わるたびに list_tasks を取り直す。ready が 0 件になったら終える。stuck のものは理由を添えてユーザーに返す。
 ユーザーの大まかな依頼は、依頼そのものを親タスクとして登録し（説明に依頼文をそのまま残す）、1 セッションで終わる大きさの子タスク（parent）に分ける。順番があるものは dependsOn でつなぐ。
 不要になったタスクは消さずに cancelled にし、理由を note に残す。
-ユーザーも画面からタスクを登録・編集する。createdBy: user のタスクや by: user のメモはユーザーの指示として扱う。
+ダッシュボードは見るだけで、ボードに書くのは AI だけ。ユーザーの依頼を受けて、AI が登録・編集する。過去に画面から書かれた createdBy: user のタスクや by: user のメモは、ユーザーの指示として扱う。
 作業に入るタスクは update_task で status を doing にし、区切りごとに note で経過を残す。結果は自分で確かめて done にする（ユーザーの確認待ちの review は使わない）。paths に docs 以外があるタスクは、テストだけでなく実際に動かし、done のメモに「動かした: \`コマンド\` → 結果」の行を入れる（手段は docs/verification.md）。
 方針の判断も AI が行い、理由を create_decision か note に残す。AI に物理的にできないこと（ログイン、支払い、外部への公開など）だけ blocked にして、ユーザーにしてほしいことを note に書く。
 設計上の判断をしたら create_decision で docs/decisions/ に記録する（後から覆すときは新しい記録を作り、古い方を「置き換え」にする）。
@@ -180,11 +180,10 @@ server.registerTool(
 server.registerTool(
   "update_task",
   {
-    description:
-      "タスクを更新する。指定した項目だけ変わる。note を渡すとメモの履歴に追記される。ユーザーが画面から書いたメモには by: user が付く",
+    description: "タスクを更新する。指定した項目だけ変わる。note を渡すとメモの履歴に追記される",
     inputSchema: { id: z.string(), ...TaskUpdateInput.shape },
   },
-  ({ id, ...patch }) => tool(() => updateTask(id, { ...patch, by: "ai" })),
+  ({ id, ...patch }) => tool(() => updateTask(id, patch)),
 );
 
 server.registerTool(

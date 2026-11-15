@@ -1,4 +1,4 @@
-// サーバの、経路・Host・Origin・本文の大きさ・変更通知の細かい振る舞いを確かめる。
+// サーバの、経路・Host・変更通知の細かい振る舞いを確かめる。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -31,7 +31,7 @@ after(() => close());
 type Reply = { status: number; headers: IncomingHttpHeaders; body: string };
 
 // fetch は Host ヘッダを差し替えられないので、node:http で送る
-function send(method: string, path: string, headers: Record<string, string> = {}, body?: string): Promise<Reply> {
+function send(method: string, path: string, headers: Record<string, string> = {}): Promise<Reply> {
   return new Promise((resolve, reject) => {
     const req = request(base + path, { method, headers }, (res) => {
       const chunks: Buffer[] = [];
@@ -41,12 +41,9 @@ function send(method: string, path: string, headers: Record<string, string> = {}
       );
     });
     req.on("error", reject);
-    req.end(body);
+    req.end();
   });
 }
-
-const write = (method: string, path: string, body: string, headers: Record<string, string> = {}) =>
-  send(method, path, { "content-type": "application/json", origin: base, ...headers }, body);
 
 async function until(condition: () => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -75,7 +72,25 @@ test("画面・解析器・API を返し、キャッシュさせない", async (
   const snapshot = await send("GET", "/api/snapshot?x=1");
   assert.deepEqual([snapshot.status, JSON.parse(snapshot.body).project.name], [200, "t"]);
   assert.equal((await send("GET", "/nope")).status, 404);
-  assert.equal((await send("PUT", "/api/tasks")).status, 405);
+});
+
+test("書き込みの口は無く、同じ Origin からの JSON でも 405 で断る", async () => {
+  const before = store.readTasks().tasks.length;
+  const headers = { origin: base, "content-type": "application/json" };
+  for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
+    for (const path of ["/api/tasks", "/api/tasks/T-001", "/"]) {
+      const reply = await send(method, path, headers);
+      assert.deepEqual([reply.status, reply.headers["cache-control"]], [405, "no-store"], `${method} ${path}`);
+    }
+  }
+  assert.equal(store.readTasks().tasks.length, before, "何も書かない");
+});
+
+test("画面には、追加・編集・ドラッグでの状態変更の口が無い", async () => {
+  const page = (await send("GET", "/")).body;
+  for (const control of ['id="new-task"', 'id="view-edit"', 'id="task-form"', "draggable", "method: "])
+    assert.ok(!page.includes(control), control);
+  assert.match(page, /id="view-close"/, "詳細を見て閉じる口は残す");
 });
 
 test("Host は、ポートと大文字小文字の違いを無視して比べる", async () => {
@@ -85,63 +100,6 @@ test("Host は、ポートと大文字小文字の違いを無視して比べる
   for (const host of ["127.0.0.1.evil.example", "evil.example:4848", `x${TS}`, "extra.example.ts.net"]) {
     assert.equal((await send("GET", "/api/hosts", { host })).status, 403, host);
   }
-});
-
-test("書き込みは、同じ Origin からの JSON だけを受け付ける", async () => {
-  const body = JSON.stringify({ title: "書き込み" });
-  assert.equal((await write("POST", "/api/tasks", body)).status, 201);
-  assert.equal(
-    (await write("POST", "/api/tasks", body, { "content-type": "application/json; charset=utf-8" })).status,
-    201,
-  );
-  assert.equal(
-    (await write("POST", "/api/tasks", body, { origin: `https://${hostPort}` })).status,
-    403,
-    "loopback は http だけ",
-  );
-  assert.equal(
-    (await write("POST", "/api/tasks", body, { origin: `http://localhost:${hostPort.split(":")[1]}` })).status,
-    403,
-    "Host と違う名前",
-  );
-  assert.equal(
-    (await write("POST", "/api/tasks", body, { origin: "http://127.0.0.1:1" })).status,
-    403,
-    "Host と違うポート",
-  );
-  assert.equal((await write("POST", "/api/tasks", body, { origin: "null" })).status, 403);
-  assert.equal((await write("POST", "/api/tasks", body, { "content-type": "text/json" })).status, 403);
-  const refused = await write("POST", "/api/tasks", body, { origin: "https://evil.example" });
-  assert.match(refused.body, /受け付けない/);
-});
-
-test("書き込みの経路と本文を確かめ、理由つきで断る", async () => {
-  const created = JSON.parse((await write("POST", "/api/tasks", JSON.stringify({ title: "経路" }))).body);
-  assert.equal((await write("PATCH", `/api/tasks/${created.id}`, JSON.stringify({ priority: "low" }))).status, 200);
-  assert.equal((await write("POST", "/api/other", "{}")).status, 404);
-  assert.equal((await write("POST", `/api/tasks/${created.id}`, "{}")).status, 404, "更新は PATCH だけ");
-  assert.equal((await write("PATCH", "/api/tasks", "{}")).status, 404);
-  assert.equal((await write("PATCH", "/api/tasks/T-1", "{}")).status, 404, "ID は 3 桁以上");
-  assert.equal((await write("PATCH", `/api/tasks/${created.id}x`, "{}")).status, 404);
-
-  const broken = await write("POST", "/api/tasks", "{");
-  assert.equal(broken.status, 400);
-  assert.equal(typeof JSON.parse(broken.body).error, "string");
-  assert.match(JSON.parse((await write("POST", "/api/tasks", JSON.stringify({ title: "" }))).body).error, /^title: /);
-  assert.match(JSON.parse((await write("POST", "/api/tasks", "[]")).body).error, /^入力: /);
-  assert.match(JSON.parse((await write("PATCH", "/api/tasks/T-999", "{}")).body).error, /T-999/);
-
-  const limit = 1024 * 1024;
-  const sized = (bytes: number) =>
-    JSON.stringify({
-      title: "big",
-      description: "a".repeat(bytes - JSON.stringify({ title: "big", description: "" }).length),
-    });
-  assert.equal(Buffer.byteLength(sized(limit)), limit);
-  assert.equal((await write("POST", "/api/tasks", sized(limit))).status, 201, "上限ちょうどは受け付ける");
-  const tooLarge = await write("POST", "/api/tasks", sized(limit + 1));
-  assert.equal(tooLarge.status, 400);
-  assert.match(JSON.parse(tooLarge.body).error, /大きすぎる/);
 });
 
 test("ボードのファイルが変わると、画面に知らせる", async () => {
@@ -157,7 +115,7 @@ test("ボードのファイルが変わると、画面に知らせる", async ()
   try {
     await until(() => received.includes(": connected\n\n"));
     const changes = () => received.split("event: change\ndata: {}\n\n").length;
-    // 一時ファイル（書きかけ）では知らせない。前のテストの書き込みの通知は、負荷が高いと遅れて届くので、静かになるまで待つ
+    // 一時ファイル（書きかけ）では知らせない。前の書き込みの通知は、負荷が高いと遅れて届くので、静かになるまで待つ
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     for (let count = -1, i = 0; count !== changes() && i < 10; i++) {
       count = changes();

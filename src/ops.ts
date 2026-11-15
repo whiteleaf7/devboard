@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createLesson, createTask, setMilestone, updateTask } from "./store.ts";
 import { LessonInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
 
-// 知らない項目（書き手の by など）は黙って落とさずに断る
+// 知らない項目は黙って落とさずに断る
 export const BoardOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("create_task"), args: TaskCreateInput.strict() }),
   z.strictObject({ op: z.literal("update_task"), args: TaskUpdateInput.extend({ id: z.string() }).strict() }),
@@ -29,7 +29,7 @@ function applyOne(op: BoardOp): string {
       return createTask(op.args).id;
     case "update_task": {
       const { id, ...patch } = op.args;
-      return updateTask(id, { ...patch, by: "ai" }).id;
+      return updateTask(id, patch).id;
     }
     case "add_lesson":
       return createLesson(op.args).id;

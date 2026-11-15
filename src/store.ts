@@ -15,7 +15,6 @@ import {
   MilestoneInput,
   Project,
   Task,
-  type Author,
   type Decision,
   type GitInfo,
   type NewTask,
@@ -124,9 +123,8 @@ function assertLinks(
   }
 }
 
-// AI の書き込みは、ボードの決まりに新しく反するなら断る。ユーザーが画面から書くものは断らず、problems に出して AI が気づけるようにする
-function assertRules(before: Task[], after: Task[], by: Author): void {
-  if (by === "user") return;
+// 書き込みは、ボードの決まりに新しく反するなら断る。もとからある問題（過去にユーザーが画面から書いたものなど）は problems に出すだけにする
+function assertRules(before: Task[], after: Task[]): void {
   const milestones = new Set(readProject().milestones.map((m) => m.id));
   const introduced = [
     ...introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones)),
@@ -152,7 +150,6 @@ export function createTask(input: NewTask): Task {
     const id = padded("T", number);
     assertLinks(tasks, id, input.parent, input.dependsOn);
     const at = now();
-    const by = input.createdBy ?? "ai";
     const task = Task.parse({
       id,
       title: input.title,
@@ -166,18 +163,18 @@ export function createTask(input: NewTask): Task {
       description: input.description ?? "",
       branch: input.branch ?? null,
       notes: [],
-      createdBy: by,
+      createdBy: "ai",
       created: at,
       updated: at,
     });
-    assertRules(tasks, [...tasks, task], by);
+    assertRules(tasks, [...tasks, task]);
     saveTask(task, number);
-    appendEvent(db, { at, actor: by, kind: "task.created", subject: id, data: { task } });
+    appendEvent(db, { at, actor: "ai", kind: "task.created", subject: id, data: { task } });
     return task;
   });
 }
 
-export type TaskPatch = z.infer<typeof TaskUpdateInput> & { by?: Author };
+export type TaskPatch = z.infer<typeof TaskUpdateInput>;
 
 // 項目ごとの変更の前後。メモは別のイベントにするので含めない
 function changesOf(before: Task, after: Task): Record<string, { from: unknown; to: unknown }> {
@@ -196,10 +193,10 @@ export function updateTask(id: string, patch: TaskPatch): Task {
     const current = getTask(id);
     const { tasks } = readTasks();
     assertLinks(tasks, id, patch.parent, patch.dependsOn);
-    const { note, by = "ai", ...fields } = patch;
+    const { note, ...fields } = patch;
     const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     const at = now();
-    const added = note?.trim() ? { at, text: note.trim(), by } : null;
+    const added = note?.trim() ? { at, text: note.trim(), by: "ai" as const } : null;
     const task = Task.parse({
       ...current,
       ...defined,
@@ -210,19 +207,18 @@ export function updateTask(id: string, patch: TaskPatch): Task {
     assertRules(
       tasks,
       tasks.map((t) => (t.id === id ? task : t)),
-      by,
     );
     const number = Number(db.prepare("SELECT number FROM tasks WHERE id = ?").get(id)?.number);
     saveTask(task, number);
     const changes = changesOf(current, task);
     if (Object.keys(changes).length)
-      appendEvent(db, { at, actor: by, kind: "task.changed", subject: id, data: { changes } });
-    if (added) appendEvent(db, { at, actor: by, kind: "task.noted", subject: id, data: { note: added } });
+      appendEvent(db, { at, actor: "ai", kind: "task.changed", subject: id, data: { changes } });
+    if (added) appendEvent(db, { at, actor: "ai", kind: "task.noted", subject: id, data: { note: added } });
     return task;
   });
 }
 
-export function updateProject(change: (project: Project) => Project, by: Author = "ai"): Project {
+export function updateProject(change: (project: Project) => Project): Project {
   const db = board();
   return write(db, () => {
     const before = readProject();
@@ -237,7 +233,7 @@ export function updateProject(change: (project: Project) => Project, by: Author 
     );
     appendEvent(db, {
       at: now(),
-      actor: by,
+      actor: "ai",
       kind: "project.changed",
       subject: "project",
       data: { from: before, to: after },
@@ -246,7 +242,7 @@ export function updateProject(change: (project: Project) => Project, by: Author 
   });
 }
 
-export function setMilestone({ id, title, goal, status }: z.infer<typeof MilestoneInput>, by: Author = "ai"): Project {
+export function setMilestone({ id, title, goal, status }: z.infer<typeof MilestoneInput>): Project {
   return updateProject((project) => {
     const i = project.milestones.findIndex((m) => m.id === id);
     if (i < 0) {
@@ -257,7 +253,7 @@ export function setMilestone({ id, title, goal, status }: z.infer<typeof Milesto
       project.milestones[i] = { ...m, title: title ?? m.title, goal: goal ?? m.goal, status: status ?? m.status };
     }
     return project;
-  }, by);
+  });
 }
 
 // ---- 教訓 ----

@@ -15,7 +15,7 @@ export type Priority = z.infer<typeof Priority>;
 // 依存先がこの状態なら「終わった」とみなす
 export const FINISHED: readonly TaskStatus[] = ["done", "cancelled"];
 
-// 誰が書いたか。ユーザーが画面から入れたものは user、MCP や AI の編集は ai
+// 誰が書いたか。いまの書き込みはすべて ai。user は、ダッシュボードから書けたころ（決定記録 0038 まで）の記録に残る
 export const Author = z.enum(["user", "ai"]);
 export type Author = z.infer<typeof Author>;
 
@@ -99,7 +99,7 @@ export const TaskCreateInput = z.object({
   dependsOn: z.array(z.string()).optional().describe("先に終わっている必要があるタスク ID（置き換え）"),
   priority: Priority.optional().describe("既定は normal"),
 });
-export type NewTask = z.infer<typeof TaskCreateInput> & { createdBy?: Author };
+export type NewTask = z.infer<typeof TaskCreateInput>;
 
 export const TaskUpdateInput = TaskCreateInput.partial().extend({
   labels: z.array(z.string()).optional().describe("置き換え（追記ではない）"),

@@ -5,11 +5,9 @@
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
-//   POST  /api/tasks       タスクの追加（画面から。createdBy: user）
-//   PATCH /api/tasks/:id   タスクの更新（画面から。メモは by: user）
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
-// 書き込みは、この画面と同じ Origin からの JSON だけを受け付ける。
-// tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host と Origin に許可する。
+// 読み取り専用。ボードへの書き込みは MCP と `pnpm board:apply` だけが行う（決定記録 0038）。
+// tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host に許可する。
 // 許可する名前は起動時に `tailscale status` から取る。NAGAYA_DEV_HOSTS（カンマ区切り）で足せる。
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -19,7 +17,7 @@ import { z } from "zod";
 import { loadActivity } from "./activity-sources.ts";
 import { board, latestSeq } from "./board-db.ts";
 import { tailnetName } from "./tailnet.ts";
-import { decisionsDir, repoRoot, snapshot, createTask, updateTask, TaskCreateInput, TaskUpdateInput } from "./store.ts";
+import { decisionsDir, repoRoot, snapshot } from "./store.ts";
 
 export const DEFAULT_PORT = 4848;
 const BOARD_POLL_MS = 500;
@@ -49,67 +47,6 @@ function hostAllowed(req: IncomingMessage, remote: string[]): boolean {
   return LOOPBACK.includes(host) || remote.includes(host);
 }
 
-// 書き込みは、この画面からの fetch に限る。
-// 他のサイトのページからの送信は Origin が一致しないので拒否する。JSON 以外を拒否するのは、
-// フォーム送信のようにプリフライトなしで届くリクエストを通さないため。
-// loopback は http、tailnet の名前は tailscale serve が終端する https の Origin だけを認める
-function writeAllowed(req: IncomingMessage, remote: string[]): boolean {
-  const type = req.headers["content-type"] ?? "";
-  if (!type.startsWith("application/json")) return false;
-  let origin: URL;
-  try {
-    origin = new URL(req.headers.origin ?? "");
-  } catch {
-    return false;
-  }
-  const host = origin.hostname.toLowerCase();
-  if (LOOPBACK.includes(host) || host === "::1") return origin.protocol === "http:" && origin.host === req.headers.host;
-  return origin.protocol === "https:" && remote.includes(host);
-}
-
-const MAX_BODY = 1024 * 1024;
-
-async function readJson(req: IncomingMessage): Promise<unknown> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req as AsyncIterable<Buffer>) {
-    size += chunk.length;
-    if (size > MAX_BODY) throw new Error("本文が大きすぎる");
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
-
-function errorMessage(e: unknown): string {
-  if (e instanceof z.ZodError) return e.issues.map((i) => `${i.path.join(".") || "入力"}: ${i.message}`).join("\n");
-  return e instanceof Error ? e.message : String(e);
-}
-
-async function handleWrite(
-  req: IncomingMessage,
-  res: ServerResponse,
-  pathname: string,
-  remote: string[],
-): Promise<void> {
-  if (!writeAllowed(req, remote))
-    return send(res, 403, "text/plain; charset=utf-8", "この画面以外からの書き込みは受け付けない");
-  const json = (status: number, value: unknown) =>
-    send(res, status, "application/json; charset=utf-8", JSON.stringify(value));
-  try {
-    const body = await readJson(req);
-    if (req.method === "POST" && pathname === "/api/tasks") {
-      return json(201, createTask({ ...TaskCreateInput.parse(body), createdBy: "user" }));
-    }
-    const id = /^\/api\/tasks\/(T-\d{3,})$/.exec(pathname)?.[1];
-    if (req.method === "PATCH" && id) {
-      return json(200, updateTask(id, { ...TaskUpdateInput.parse(body), by: "user" }));
-    }
-    return send(res, 404, "text/plain", "not found");
-  } catch (e) {
-    return json(400, { error: errorMessage(e) });
-  }
-}
-
 const ActivityDays = z.coerce.number().int().min(0).max(366);
 
 async function handleActivity(res: ServerResponse, url: URL): Promise<void> {
@@ -118,7 +55,7 @@ async function handleActivity(res: ServerResponse, url: URL): Promise<void> {
   try {
     return send(res, 200, "application/json; charset=utf-8", JSON.stringify(await loadActivity(days.data)));
   } catch (e) {
-    return send(res, 500, "text/plain; charset=utf-8", errorMessage(e));
+    return send(res, 500, "text/plain; charset=utf-8", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -168,7 +105,6 @@ export function startServer(port = Number(process.env.NAGAYA_DEV_PORT ?? DEFAULT
   const server = createServer((req, res) => {
     if (!hostAllowed(req, remote)) return send(res, 403, "text/plain", "forbidden host");
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    if (req.method === "POST" || req.method === "PATCH") return void handleWrite(req, res, url.pathname, remote);
     if (req.method !== "GET") return send(res, 405, "text/plain", "method not allowed");
     switch (url.pathname) {
       case "/":
