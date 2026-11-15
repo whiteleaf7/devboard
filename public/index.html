@@ -9,6 +9,9 @@
 <title>nagaya devboard</title>
 <link rel="stylesheet" href="/base.css">
 <style>
+  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .section-head h2 { margin: 0; }
+  .section-head button.secondary { font-size: 12px; padding: 2px 8px; color: var(--sub); }
   .milestones { display: flex; gap: var(--gap); flex-wrap: wrap; }
   .ms { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; min-width: 200px; max-width: 320px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .ms[aria-pressed="true"] { outline: 2px solid var(--doing); outline-offset: -1px; }
@@ -139,7 +142,10 @@
 <main>
   <div class="errors" id="errors"></div>
   <section>
-    <h2>マイルストーン</h2>
+    <div class="section-head">
+      <h2>マイルストーン</h2>
+      <button type="button" class="secondary" id="toggle-done-milestones" aria-pressed="false" hidden></button>
+    </div>
     <div class="milestones" id="milestones"></div>
   </section>
   <section>
@@ -213,6 +219,8 @@ for (const r of document.querySelectorAll('#settings input[name="theme"]')) {
 
 let data = null;
 let filter = null; // 選択中のマイルストーン ID
+const SHOW_DONE_MILESTONES_KEY = "nagaya-devboard-show-done-milestones";
+let showDoneMilestones = localStorage.getItem(SHOW_DONE_MILESTONES_KEY) === "true";
 let mobileStatus = "todo"; // スマホで表示している列
 const limits = new Map(); // 一覧（列の状態か "decisions"）ごとに開いた件数。変更の通知で描き直しても保つ
 
@@ -349,7 +357,19 @@ function render() {
   $("git").textContent = git.branch ? `${git.branch}${git.dirty ? ` · 未コミット ${git.dirty}` : ""}` : "";
   $("errors").textContent = errors.join("\n");
 
-  $("milestones").replaceChildren(...project.milestones.map((m) => {
+  const doneMilestones = project.milestones.filter((m) => m.status === "done").length;
+  const toggle = $("toggle-done-milestones");
+  toggle.hidden = doneMilestones === 0;
+  toggle.textContent = showDoneMilestones ? "完了を隠す" : `完了を表示（${doneMilestones}）`;
+  toggle.setAttribute("aria-pressed", String(showDoneMilestones));
+  toggle.onclick = () => {
+    showDoneMilestones = !showDoneMilestones;
+    localStorage.setItem(SHOW_DONE_MILESTONES_KEY, String(showDoneMilestones));
+    if (!showDoneMilestones && project.milestones.find((m) => m.id === filter)?.status === "done") filter = null;
+    render();
+  };
+  const listed = project.milestones.filter((m) => showDoneMilestones || m.status !== "done");
+  $("milestones").replaceChildren(...listed.map((m) => {
     const mine = tasks.filter((t) => t.milestone === m.id);
     const done = mine.filter((t) => t.status === "done").length;
     const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
