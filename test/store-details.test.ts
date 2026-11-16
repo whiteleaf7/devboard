@@ -131,7 +131,7 @@ test("書き込みは、ボードの決まりに新しく反するなら断る",
   const feature = store.createTask({ title: "振る舞いを変える", paths: ["tools/devboard/src/"] });
   assert.throws(
     () => store.updateTask(feature.id, { status: "done", note: "pnpm test と pnpm typecheck が通った" }),
-    /動かした.*docs\/verification\.md/s,
+    /動かした.*devboard apply/s,
     "テストだけのメモでは閉じない",
   );
   assert.equal(

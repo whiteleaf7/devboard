@@ -1,6 +1,7 @@
 // 過去の記録（タスク・決定記録・教訓）から、質問に関係の深いものを探す。
 // 日本語は単語に分けず、2 文字ずつの組で突き合わせる（辞書も外部のサービスも使わない）。
 
+import { readConfig } from "./config.ts";
 import type { Decision, Lesson, Task } from "./store.ts";
 
 export type RecallDoc = { id: string; kind: "task" | "decision" | "lesson"; title: string; body: string };
@@ -14,13 +15,13 @@ const TITLE_WEIGHT = 3;
 // ひらがなだけの組（助詞や活用）は、内容を表さないので軽くする
 const KANA_ONLY_WEIGHT = 0.3;
 
-// held-out のシナリオを触ったタスクの説明・メモと、それに結び付いた教訓の本文は返さない。
-// ハーネスを改善する側が recall で中身を目にすると、最終評価が意味を失うため（docs/harness.md）
-const HELDOUT_PATH = "tools/harness/eval/heldout/";
-const SEALED_BODY = "held-out のシナリオを触った記録。中身は recall では返さない";
+// 設定の hiddenPaths（.devboard.json）に当たるパスを触ったタスクの説明・メモと、それに結び付いた教訓の本文は返さない。
+// たとえば最終評価用の資料を、改善する側が recall で目にすると、評価が意味を失うため
+const SEALED_BODY = "非公開のパスを触った記録。中身は recall では返さない";
 
-function touchesHeldout(task: Task): boolean {
-  return task.paths.some((path) => `${path.replace(/^\.\//, "")}/`.startsWith(HELDOUT_PATH));
+function touchesHidden(task: Task): boolean {
+  const hidden = readConfig().hiddenPaths.map((prefix) => `${prefix.replace(/^\.\//, "").replace(/\/+$/, "")}/`);
+  return task.paths.some((path) => hidden.some((prefix) => `${path.replace(/^\.\//, "").replace(/\/+$/, "")}/`.startsWith(prefix)));
 }
 
 export function tokenize(text: string): string[] {
@@ -38,7 +39,7 @@ export function tokenize(text: string): string[] {
 }
 
 export function buildDocs(tasks: Task[], decisions: Decision[], lessons: Lesson[]): RecallDoc[] {
-  const sealed = new Set(tasks.filter(touchesHeldout).map((t) => t.id));
+  const sealed = new Set(tasks.filter(touchesHidden).map((t) => t.id));
   return [
     ...tasks.map(
       (t): RecallDoc => ({

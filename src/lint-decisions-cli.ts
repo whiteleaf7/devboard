@@ -1,4 +1,4 @@
-// 決定記録の形式を検査する（`devboard lint-decisions`）。標準入力の JSON `[{"file": "docs/decisions/0001-x.md", "text": "本文"}]` を読み、
+// 決定記録の形式を検査する（`devboard lint-decisions`）。標準入力の JSON `[{"file": "<パス>/0001-x.md", "text": "本文"}]` を読み、
 // 問題を JSON の配列で出す。問題があれば終了コード 1、入力が不正なら 2。ボードにもプロジェクトの場所にも触れないので、CI から使える
 
 import { readFileSync } from "node:fs";
@@ -11,7 +11,7 @@ let input: unknown;
 try {
   input = JSON.parse(readFileSync(0, "utf8"));
 } catch {
-  console.error('devboard lint-decisions: 標準入力が JSON ではない。[{"file": "docs/decisions/0001-x.md", "text": "本文"}] の形で渡す');
+  console.error('devboard lint-decisions: 標準入力が JSON ではない。[{"file": "<パス>/0001-x.md", "text": "本文"}] の形で渡す');
   process.exit(2);
 }
 const parsed = Input.safeParse(input);

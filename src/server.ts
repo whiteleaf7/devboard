@@ -4,7 +4,7 @@
 //   GET /base.css, /theme.js, /markdown.js, /paging.js  画面が共有するスタイル・テーマ・Markdown の解析器・一覧の省略（public/）
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
-//   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
+//   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と決定記録のディレクトリと .git の変更で送る
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
 // 読み取り専用。ボードへの書き込みは MCP と `devboard apply` だけが行う。
 // tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host に許可する。

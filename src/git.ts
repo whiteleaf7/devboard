@@ -1,6 +1,7 @@
 // リポジトリの git の状態を読む。git が無い・リポジトリでないときは、空の結果として扱う
 
 import { execFileSync } from "node:child_process";
+import { decisionsRelativeDir } from "./config.ts";
 import { repoRoot } from "./repo-root.ts";
 import type { GitInfo } from "./schema.ts";
 
@@ -39,7 +40,7 @@ export function readGit(limit = 8): GitInfo {
   return {
     branch,
     dirty: changed.length,
-    uncommittedDecisions: changed.map(changedPath).filter((file) => file.startsWith("docs/decisions/")),
+    uncommittedDecisions: changed.map(changedPath).filter((file) => file.startsWith(`${decisionsRelativeDir()}/`)),
     commits,
   };
 }

@@ -3,6 +3,7 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { decisionsRelativeDir } from "./config.ts";
 import { ruleProblems } from "./rules.ts";
 import { DECISION_STATUSES, decisionsDir, readProject, readTasks } from "./store.ts";
 
@@ -46,7 +47,7 @@ export function boardProblems(): BoardProblem[] {
     ? readdirSync(dir)
         .filter((name) => name.endsWith(".md"))
         .sort()
-        .map((name) => ({ file: `docs/decisions/${name}`, text: readFileSync(join(dir, name), "utf8") }))
+        .map((name) => ({ file: `${decisionsRelativeDir()}/${name}`, text: readFileSync(join(dir, name), "utf8") }))
     : [];
   const { tasks, errors } = readTasks();
   const milestones = new Set(readProject().milestones.map((m) => m.id));

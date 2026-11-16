@@ -47,6 +47,27 @@ AI 自律開発のための開発ボード。タスク・教訓・マイルス�
 - 決定記録はプロジェクトの `docs/decisions/NNNN-slug.md`
 - `devboard apply` の JSON は、シェルのシングルクォートで囲む。操作の名前と入力は MCP のツールと同じ
 
+## プロジェクトごとの設定（`.devboard.json`）
+
+devboard は全プロジェクトで共有するので、プロジェクトの名前や場所はコードに持たない。違いは、プロジェクトの根の `.devboard.json`（任意。無ければ既定）で渡す。コマンドを打った場所から上へたどって最初に見つかったものを使い、無ければプロジェクトの根（main の worktree）のものを使う。
+
+```json
+{
+  "decisionsDir": "docs/decisions",
+  "hiddenPaths": ["tools/harness/eval/heldout/"],
+  "rules": {
+    "profile": "autodev",
+    "verificationHint": "手段は docs/verification.md の「使える手段」: …"
+  }
+}
+```
+
+- `decisionsDir`: 決定記録を置くディレクトリ（プロジェクトの根からの相対。既定は `docs/decisions`）
+- `hiddenPaths`: `recall` が、触ったタスクの説明・メモ・結び付いた教訓の本文を返さないパスの接頭辞（最終評価用の資料など）。既定は空
+- `rules.profile`: `autodev`（既定）は、書き込みの決まり（メモの無い done・cancelled・blocked、AI のタスクの review、子が残る親の done、動かした結果の無い振る舞いのタスクの done）を使う。`none` は使わない。つながりの検査（存在しない親・依存、循環）は、どちらでも使う
+- `rules.verificationHint`: 「動かした: `コマンド` → 結果」の書き方を断るときの案内の続き。プロジェクトの確かめる手段（文書や道具の名前）を書く
+- 知らない項目や壊れた JSON は、ファイルの名前を添えて断る
+
 ## コマンド
 
 | コマンド                      | することと                                                       |

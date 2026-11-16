@@ -2,6 +2,7 @@
 // store は書く前と後で比べ、新しく増えた問題があれば書かない。get_overview の problems にも使う。
 // done にする瞬間だけに見る決まり（closingProblems）は、決まりができる前に閉じたタスクを problems に出さないために分けている
 
+import { readConfig } from "./config.ts";
 import type { Task } from "./schema.ts";
 
 export type RuleProblem = { task: string; check: string; message: string };
@@ -30,6 +31,8 @@ function reaches(start: string, first: string[], links: (id: string) => string[]
 export function ruleProblems(tasks: Task[], milestones: Set<string>): RuleProblem[] {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const problems: RuleProblem[] = [];
+  // 書き込みの決まり（状態の理由、review、親子の終わり方）は、設定の rules.profile が autodev のときだけ使う。つながりの検査は、いつも使う
+  const policy = readConfig().rules.profile === "autodev";
   for (const task of tasks) {
     const add = (check: string, message: string) => problems.push({ task: task.id, check, message });
     if (task.milestone && !milestones.has(task.milestone))
@@ -46,10 +49,10 @@ export function ruleProblems(tasks: Task[], milestones: Set<string>): RuleProble
       add("broken-link", "親子関係が循環している");
     }
     const needsNote = NEEDS_NOTE[task.status];
-    if (needsNote && task.notes.length === 0) add("unexplained-state", needsNote);
-    if (task.status === "review" && task.createdBy === "ai")
+    if (policy && needsNote && task.notes.length === 0) add("unexplained-state", needsNote);
+    if (policy && task.status === "review" && task.createdBy === "ai")
       add("forbidden-review", "AI のタスクは review にしない。結果を自分で確かめて done にする");
-    if (task.status === "done") {
+    if (policy && task.status === "done") {
       const open = tasks
         .filter((child) => child.parent === task.id && OPEN.includes(child.status))
         .map((child) => child.id);
@@ -116,13 +119,15 @@ export function hasRunEvidence(text: string): boolean {
 // docs だけを変えるタスクは、読めば確かめられる
 const isDocument = (path: string) => path.startsWith("docs/") || path.endsWith(".md");
 
-const UNVERIFIED =
+// 動かした結果の書き方の案内の続き。プロジェクトの確かめる手段は、設定の rules.verificationHint で渡す
+const GENERIC_HINT =
+  "（例: 動かした: `<コマンド>` → 一覧に 3 件出た）。CLI やサーバは起動して出力を見る、ボードの操作は DEVBOARD_DB の写しに devboard apply";
+
+const unverifiedMessage = (): string =>
   "振る舞いを変えるタスク（paths か、`Task:` の行でこのタスクを指したコミットに docs 以外がある）は、" +
   "実際に動かした結果をメモに残してから done にする。" +
   "テスト・型チェック・lint・ビルドだけでは足りない。note に「動かした: `コマンド` → 結果」の行を書く" +
-  "（例: 動かした: `pnpm --filter @repo/verify screenshot <URL> .dev/verify/board.png --wait-for <セレクタ>` → 一覧に 3 件出た）。" +
-  "手段は docs/verification.md の「使える手段」: 画面は screenshot、ネイティブのウィンドウは windows、" +
-  "CLI やサーバは起動して出力を見る、ボードの操作は DEVBOARD_DB の写しに devboard apply";
+  (readConfig().rules.verificationHint || GENERIC_HINT);
 
 // この変更で done になったタスクのうち、動かした結果の無いもの。
 // 振る舞いを変えたかは、予定（paths）と、コミットが実際に変えたファイル（committedFiles）の両方で見る。paths を書かずに閉じても抜けられないように
@@ -131,10 +136,11 @@ export function closingProblems(
   after: Task[],
   committedFiles: (id: string) => string[] = () => [],
 ): RuleProblem[] {
+  if (readConfig().rules.profile === "none") return [];
   const wasDone = new Set(before.filter((t) => t.status === "done").map((t) => t.id));
   return after
     .filter((t) => t.status === "done" && !wasDone.has(t.id))
     .filter((t) => !t.notes.some((note) => hasRunEvidence(note.text)))
     .filter((t) => [...t.paths, ...committedFiles(t.id)].some((path) => !isDocument(path)))
-    .map((t) => ({ task: t.id, check: "unverified-done", message: UNVERIFIED }));
+    .map((t) => ({ task: t.id, check: "unverified-done", message: unverifiedMessage() }));
 }

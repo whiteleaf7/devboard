@@ -1,9 +1,11 @@
 import { test, before } from "node:test";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { buildDocs, recall, tokenize, type RecallDoc } from "../src/recall.ts";
 import { useTempBoard } from "./temp-board.ts";
 
-useTempBoard("recall");
+const root = useTempBoard("recall");
 const store = await import("../src/store.ts");
 
 before(() => {
@@ -75,7 +77,8 @@ test("教訓を採番して残し、タスク・決定記録と一緒に探せ�
   assert.deepEqual([found[0]?.id, found[0]?.kind], ["L-001", "lesson"]);
 });
 
-test("held-out を触ったタスクと、それに結び付いた教訓は、タイトルだけで中身を返さない", () => {
+test("設定の hiddenPaths に当たるパスを触ったタスクと、それに結び付いた教訓は、タイトルだけで中身を返さない", () => {
+  writeFileSync(join(root, ".devboard.json"), JSON.stringify({ hiddenPaths: ["tools/harness/eval/heldout/"] }));
   const heldout = store.createTask({
     title: "held-out のシナリオを足す",
     description: "秘密の目印の行を説明に書いた",
@@ -90,7 +93,7 @@ test("held-out を触ったタスクと、それに結び付いた教訓は、�
   const hits = recall("held-out の目印の行", docs, 20);
   const sealed = hits.filter((h) => h.title.startsWith("held-out"));
   assert.equal(sealed.length, 2, "タイトルでは引ける");
-  for (const hit of sealed) assert.match(hit.excerpt, /held-out のシナリオを触った記録/);
+  for (const hit of sealed) assert.match(hit.excerpt, /非公開のパスを触った記録/);
   assert.equal(recall("秘密", docs).length, 0, "説明・メモ・教訓の本文では引けない");
   assert.match(hits.find((h) => h.id === open.id)?.excerpt ?? "", /公開のメモ/);
 });

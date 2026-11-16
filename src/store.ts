@@ -1,5 +1,5 @@
 // 開発ボードのデータを読み書きする。ダッシュボード（server.ts）と MCP サーバ（mcp.ts）の両方がこれを使う。
-// タスク・教訓・マイルストーンは git の外の SQLite（board-db.ts）、決定記録はリポジトリの docs/decisions/（decisions.ts）に置く。
+// タスク・教訓・マイルストーンは git の外の SQLite（board-db.ts）、決定記録はリポジトリの決定記録のディレクトリ（decisions.ts）に置く。
 
 import { basename } from "node:path";
 import type { z } from "zod";

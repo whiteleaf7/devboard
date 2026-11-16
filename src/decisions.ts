@@ -1,12 +1,13 @@
-// 決定記録（リポジトリの docs/decisions/NNNN-slug.md）を読み書きする
+// 決定記録（プロジェクトの決定記録のディレクトリ。既定は docs/decisions の NNNN-slug.md）を読み書きする
 
 import { readFileSync, readdirSync, writeFileSync, renameSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { withLock } from "./lock.ts";
+import { decisionsRelativeDir } from "./config.ts";
 import { repoRoot } from "./repo-root.ts";
 import type { DECISION_STATUSES, Decision } from "./schema.ts";
 
-export const decisionsDir = () => join(repoRoot(), "docs", "decisions");
+export const decisionsDir = () => join(repoRoot(), decisionsRelativeDir());
 
 function today(): string {
   const d = new Date();
@@ -34,7 +35,7 @@ function parseDecision(file: string, text: string): Decision {
   const title = /^#\s*\d{4}\.\s*(.+)$/m.exec(text)?.[1]?.trim() ?? file;
   const status = /^-\s*状態:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? "不明";
   const date = /^-\s*日付:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? "";
-  return { number, file: `docs/decisions/${file}`, title, status, date, body: text };
+  return { number, file: `${decisionsRelativeDir()}/${file}`, title, status, date, body: text };
 }
 
 export function readDecisions(): Decision[] {
