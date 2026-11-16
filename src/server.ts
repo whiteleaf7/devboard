@@ -6,7 +6,7 @@
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と docs/decisions/ と .git の変更で送る
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
-// 読み取り専用。ボードへの書き込みは MCP と `pnpm board:apply` だけが行う（決定記録 0038）。
+// 読み取り専用。ボードへの書き込みは MCP と `devboard apply` だけが行う。
 // tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host に許可する。
 // 許可する名前は起動時に `tailscale status` から取る。DEVBOARD_HOSTS（カンマ区切り）で足せる。
 

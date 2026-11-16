@@ -14,5 +14,5 @@
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "public/*.js"]
+  "include": ["bin", "src", "test", "public/*.js"]
 }

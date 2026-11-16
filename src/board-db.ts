@@ -1,11 +1,11 @@
-// ボードの保存先（決定記録 0011）。git の外の SQLite に、変更をイベントとして追記し、いまの状態の表を同じトランザクションで更新する。
+// ボードの保存先。git の外の SQLite に、変更をイベントとして追記し、いまの状態の表を同じトランザクションで更新する。
 // どの worktree から使っても同じファイルを読み書きする。
 
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
-import { mainWorktreeOf } from "./worktree.ts";
+import { repoRoot } from "./repo-root.ts";
 
 // 書き込みが重なったときに待つ時間。書き込みは数ミリ秒で終わる
 const BUSY_TIMEOUT_MS = 10_000;
@@ -35,8 +35,7 @@ export function boardFile(): string {
   // node --test の中から本物のボードに書かないように止める
   if (process.env.NODE_TEST_CONTEXT)
     throw new Error("テストでは DEVBOARD_DB に一時ファイルを指定する（本物のボードに書かないため）");
-  const main = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
-  return join(homedir(), ".devboard", "boards", `${basename(main)}.sqlite`);
+  return join(homedir(), ".devboard", "boards", `${basename(repoRoot())}.sqlite`);
 }
 
 // WAL への切り替えは、待ち時間の設定が効かずにすぐ SQLITE_BUSY を返すことがある（新しいファイルを複数のプロセスが同時に開いたとき）

@@ -1,4 +1,4 @@
-// pnpm recall（src/recall-cli.ts）を、一時的なボードに向けて動かす
+// devboard recall（src/recall-cli.ts）を、一時的なボードに向けて動かす
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

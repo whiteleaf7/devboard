@@ -1,8 +1,8 @@
 // Tailscale でダッシュボードを tailnet 内（スマホなど）に公開する。
 // サーバは 127.0.0.1 で待ち受けたまま、`tailscale serve` に HTTPS で中継させる。
 //
-//   pnpm board:tailscale       ダッシュボードを起動し、tailscale serve で公開して URL を出す
-//   pnpm board:tailscale off   公開をやめる（ダッシュボードは止めない）
+//   devboard tailscale       ダッシュボードを起動し、tailscale serve で公開して URL を出す
+//   devboard tailscale off   公開をやめる（ダッシュボードは止めない）
 //
 // 既存の serve 設定を壊さないよう、専用の HTTPS ポート（既定 8448、DEVBOARD_TS_PORT で変更）だけを使う。
 

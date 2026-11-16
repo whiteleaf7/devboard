@@ -1,15 +1,15 @@
-// MCP が使えないエージェントやシェルから、ボードを読む CLI（`pnpm board:show`）。
-//   pnpm board:show [overview]
-//   pnpm board:show tasks [--status todo] [--ready] [--milestone M1] [--label bug] [--parent T-001] [--detail]
-//   pnpm board:show task <T-NNN>
-//   pnpm board:show decisions
-//   pnpm board:show decision <番号>
+// MCP が使えないエージェントやシェルから、ボードを読む CLI（`devboard show`）。
+//   devboard show [overview]
+//   devboard show tasks [--status todo] [--ready] [--milestone M1] [--label bug] [--parent T-001] [--detail]
+//   devboard show task <T-NNN>
+//   devboard show decisions
+//   devboard show decision <番号>
 
 import { boardGetDecision, boardGetTask, boardListDecisions, boardListTasks, boardOverview } from "./queries.ts";
 import { TaskStatus } from "./store.ts";
 
 const USAGE =
-  "使い方: pnpm board:show [overview | tasks [--status <状態>] [--ready] [--milestone <ID>] [--label <名>] [--parent <ID>] [--detail] | task <T-NNN> | decisions | decision <番号>]";
+  "使い方: devboard show [overview | tasks [--status <状態>] [--ready] [--milestone <ID>] [--label <名>] [--parent <ID>] [--detail] | task <T-NNN> | decisions | decision <番号>]";
 
 export function runCli(argv: string[]): unknown {
   const [sub = "overview", ...rest] = argv;
@@ -63,7 +63,7 @@ if (import.meta.main) {
   try {
     console.log(JSON.stringify(runCli(process.argv.slice(2)), null, 2));
   } catch (e) {
-    console.error(`board:show: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`devboard show: ${e instanceof Error ? e.message : String(e)}`);
     process.exit(1);
   }
 }

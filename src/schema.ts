@@ -15,7 +15,7 @@ export type Priority = z.infer<typeof Priority>;
 // 依存先がこの状態なら「終わった」とみなす
 export const FINISHED: readonly TaskStatus[] = ["done", "cancelled"];
 
-// 誰が書いたか。いまの書き込みはすべて ai。user は、ダッシュボードから書けたころ（決定記録 0038 まで）の記録に残る
+// 誰が書いたか。いまの書き込みはすべて ai。user は、ダッシュボードから書けたころの記録に残る
 export const Author = z.enum(["user", "ai"]);
 export type Author = z.infer<typeof Author>;
 
@@ -32,7 +32,7 @@ export const Task = z.looseObject({
   dependsOn: z.array(z.string()).default([]),
   priority: Priority.default("normal"),
   labels: z.array(z.string()).default([]),
-  // 触る予定のパスの接頭辞。並行して着手してよいかの判断に使う（決定記録 0010）
+  // 触る予定のパスの接頭辞。並行して着手してよいかの判断に使う
   paths: z.array(z.string()).default([]),
   description: z.string().default(""),
   branch: z.string().nullable().default(null),
@@ -78,7 +78,7 @@ export type Decision = {
 export type GitInfo = {
   branch: string | null;
   dirty: number;
-  // 作業者が書いて報告し、司令塔がまだ取り込んでいない決定記録（0015）。見落とすと main の worktree に取り残される
+  // 作業者が書いて報告し、司令塔がまだ取り込んでいない決定記録。見落とすと main の worktree に取り残される
   uncommittedDecisions: string[];
   commits: { hash: string; subject: string; date: string }[];
 };

@@ -1,12 +1,9 @@
-// ボードの道具が読み書きするリポジトリの場所。テストは DEVBOARD_ROOT で一時ディレクトリに向ける
+// ボードの道具が読み書きするプロジェクトの場所。devboard は各プロジェクトの外にある共通のコマンドなので、
+// 自分の置き場所ではなく、コマンドを打った場所（cwd）から決める。テストや別の場所からは DEVBOARD_ROOT で向ける
 
-import { resolve } from "node:path";
-import { mainWorktreeOf } from "./worktree.ts";
-
-// 作業用の worktree から呼ばれても、main の worktree の決定記録を使う（決定記録 0010）
-const ownRoot = mainWorktreeOf(resolve(import.meta.dirname, "../../.."));
+import { projectRootOf } from "./worktree.ts";
 
 export function repoRoot(): string {
   // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
-  return process.env.DEVBOARD_ROOT ?? process.env.NAGAYA_ROOT ?? ownRoot;
+  return process.env.DEVBOARD_ROOT ?? process.env.NAGAYA_ROOT ?? projectRootOf(process.cwd());
 }

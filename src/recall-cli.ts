@@ -1,4 +1,4 @@
-// 過去の記録を探す。ルートの `pnpm recall [--json] [--limit 件数] <質問>` から呼ぶ。
+// 過去の記録を探す。`devboard recall [--json] [--limit 件数] <質問>` から呼ぶ。
 
 import { parseArgs } from "node:util";
 import { buildDocs, recall } from "./recall.ts";
@@ -10,7 +10,7 @@ const { values, positionals } = parseArgs({
 });
 const query = positionals.join(" ").trim();
 if (!query) {
-  console.error("使い方: pnpm recall [--json] [--limit 件数] <質問>");
+  console.error("使い方: devboard recall [--json] [--limit 件数] <質問>");
   process.exit(1);
 }
 

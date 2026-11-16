@@ -1,5 +1,5 @@
 // ボードの決まり（CLAUDE.md の「作業するとき」）に合わない状態を探す。
-// store は書く前と後で比べ、新しく増えた問題があれば書かない（決定記録 0011）。get_overview の problems にも使う。
+// store は書く前と後で比べ、新しく増えた問題があれば書かない。get_overview の problems にも使う。
 // done にする瞬間だけに見る決まり（closingProblems）は、決まりができる前に閉じたタスクを problems に出さないために分けている
 
 import type { Task } from "./schema.ts";
@@ -122,7 +122,7 @@ const UNVERIFIED =
   "テスト・型チェック・lint・ビルドだけでは足りない。note に「動かした: `コマンド` → 結果」の行を書く" +
   "（例: 動かした: `pnpm --filter @repo/verify screenshot <URL> .dev/verify/board.png --wait-for <セレクタ>` → 一覧に 3 件出た）。" +
   "手段は docs/verification.md の「使える手段」: 画面は screenshot、ネイティブのウィンドウは windows、" +
-  "CLI やサーバは起動して出力を見る、ボードの操作は DEVBOARD_DB の写しに pnpm board:apply";
+  "CLI やサーバは起動して出力を見る、ボードの操作は DEVBOARD_DB の写しに devboard apply";
 
 // この変更で done になったタスクのうち、動かした結果の無いもの。
 // 振る舞いを変えたかは、予定（paths）と、コミットが実際に変えたファイル（committedFiles）の両方で見る。paths を書かずに閉じても抜けられないように

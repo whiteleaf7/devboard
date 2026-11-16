@@ -1,4 +1,4 @@
-// pnpm board:import（src/board-import.ts）を、一時的な git のリポジトリと空のボードに向けて動かす。
+// devboard import-history（src/board-import.ts）を、一時的な git のリポジトリと空のボードに向けて動かす。
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

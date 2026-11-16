@@ -1,5 +1,5 @@
-// git の履歴にあるボード（dev/tasks、dev/lessons、dev/project.json）を、SQLite のボードにイベントとして再現する（決定記録 0011）。
-//   pnpm board:import
+// git の履歴にあるボード（dev/tasks、dev/lessons、dev/project.json）を、SQLite のボードにイベントとして再現する。
+//   devboard import-history
 // コミットの順に写しを読み、作業ツリーにまだファイルがあれば最後の写しとして足す。空のボードにだけ入れる。
 // 入れたあと、ボードのいまの状態が最後の写しと一致するかを確かめる。
 
@@ -101,7 +101,7 @@ const db = board();
 const existing = Number(db.prepare("SELECT count(*) AS n FROM events").get()?.n);
 if (existing > 0) {
   console.error(
-    `board:import: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、DEVBOARD_DB で別のファイルを指定する`,
+    `devboard import-history: ${boardFile()} はもう空ではない（イベント ${existing} 件）。移し直すなら、DEVBOARD_DB で別のファイルを指定する`,
   );
   process.exit(1);
 }
@@ -110,7 +110,7 @@ const snapshots = historySnapshots();
 const current = workingTreeSnapshot();
 if (current) snapshots.push(current);
 if (!snapshots.length) {
-  console.error("board:import: git の履歴にも作業ツリーにも、ボードのファイルが無い");
+  console.error("devboard import-history: git の履歴にも作業ツリーにも、ボードのファイルが無い");
   process.exit(1);
 }
 
@@ -144,14 +144,14 @@ const mismatches = [
   ...(last.project && !same(readProject(), last.project) ? ["project"] : []),
 ];
 
-console.log(`board:import: ${boardFile()}`);
+console.log(`devboard import-history: ${boardFile()}`);
 console.log(
   `  写し ${snapshots.length} 件（コミット ${snapshots.length - (current ? 1 : 0)}${current ? "、作業ツリー 1" : ""}）`,
 );
 console.log(`  タスク ${latestTasks.size}、教訓 ${latestLessons.size}、イベント ${events.length}`);
 for (const warning of warnings) console.log(`  読めなかった: ${warning}`);
 if (mismatches.length) {
-  console.error(`board:import: 最後の写しと一致しない: ${mismatches.join(", ")}`);
+  console.error(`devboard import-history: 最後の写しと一致しない: ${mismatches.join(", ")}`);
   process.exit(1);
 }
 console.log(`  最後の写し（${current ? "作業ツリー" : "最後のコミット"}）と一致した`);
