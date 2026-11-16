@@ -10,6 +10,7 @@ const COMMANDS = {
   recall: { script: "recall-cli.ts", summary: "過去のタスク・決定記録・教訓を探す" },
   snapshot: { script: "snapshot-cli.ts", summary: "ボードの写しを SQLite のファイルとして書き出す" },
   tools: { script: "tools-cli.ts", summary: "MCP のツールの名前を JSON の配列で出す" },
+  "lint-decisions": { script: "lint-decisions-cli.ts", summary: "標準入力の決定記録（JSON）の形式を検査して、問題を JSON で出す" },
   "import-history": { script: "board-import.ts", summary: "git の履歴にある古いボードを、空の SQLite のボードに取り込む" },
 } as const;
 

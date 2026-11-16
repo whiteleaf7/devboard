@@ -33,3 +33,20 @@ test("devboard snapshot は、ボードの写しを書き出し、あるファ�
   assert.equal(second.status, 1);
   assert.match(second.stderr, /もうある/);
 });
+
+test("devboard lint-decisions は、標準入力の決定記録を検査し、問題があれば終了コード 1、入力が不正なら 2", () => {
+  const run = (input: string) =>
+    spawnSync("node", [join(import.meta.dirname, "../bin/devboard.ts"), "lint-decisions"], { input, encoding: "utf8" });
+  const good = "# 0001. はじめ\n\n- 状態: 採用\n- 日付: 2026-11-16\n\n## 背景\n\n a\n\n## 決定\n\n b\n\n## 影響\n\n c\n";
+  const ok = run(JSON.stringify([{ file: "docs/decisions/0001-first.md", text: good }]));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(JSON.parse(ok.stdout), []);
+
+  const bad = run(JSON.stringify([{ file: "docs/decisions/0001-first.md", text: "# 0001. はじめ\n" }]));
+  assert.equal(bad.status, 1);
+  const problems = JSON.parse(bad.stdout) as { check: string; file: string }[];
+  assert.ok(problems.length > 0 && problems.every((p) => p.check === "invalid-decision" && p.file.endsWith("0001-first.md")));
+
+  assert.equal(run("これは JSON ではない").status, 2);
+  assert.equal(run('{"file":"x"}').status, 2);
+});

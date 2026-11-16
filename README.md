@@ -60,6 +60,7 @@ AI 自律開発のための開発ボード。タスク・教訓・マイルス�
 | `devboard recall <質問>`      | 過去のタスク・決定記録・教訓を探す                               |
 | `devboard snapshot <ファイル>` | ボードの写しを SQLite のファイルとして書き出す（バックアップ・複製して試す用） |
 | `devboard tools`              | MCP のツールの名前を JSON の配列で出す（ドキュメントや設定の検査用） |
+| `devboard lint-decisions`     | 標準入力の決定記録（JSON `[{file,text}]`）の形式を検査し、問題を JSON で出す（あれば終了コード 1。CI から使える） |
 | `devboard import-history`     | git の履歴にある古いボードを、空の SQLite のボードに取り込む     |
 
 環境変数: `DEVBOARD_ROOT`（プロジェクトの場所）、`DEVBOARD_DB`（ボードのファイル）、`DEVBOARD_PORT`（既定 4848）、`DEVBOARD_TS_PORT`（既定 8448）、`DEVBOARD_HOSTS`（ダッシュボードに許可する tailnet の名前を足す。カンマ区切り）。
