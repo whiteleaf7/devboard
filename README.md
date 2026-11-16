@@ -26,6 +26,8 @@ Node 24 以上が必要（TypeScript をそのまま実行し、`node:sqlite` �
 | `devboard show ...`           | ボードを読む（`overview`・`tasks`・`task <ID>`・`decisions`・`decision <番号>`） |
 | `devboard apply '<JSON>'`     | ボードに操作の JSON の配列を当てる（MCP のツールと同じ名前と入力） |
 | `devboard recall <質問>`      | 過去のタスク・決定記録・教訓を探す                               |
+| `devboard snapshot <ファイル>` | ボードの写しを SQLite のファイルとして書き出す（バックアップ・複製して試す用） |
+| `devboard tools`              | MCP のツールの名前を JSON の配列で出す（ドキュメントや設定の検査用） |
 | `devboard import-history`     | git の履歴にある古いボードを、空の SQLite のボードに取り込む     |
 
 ## プロジェクトとデータの場所
