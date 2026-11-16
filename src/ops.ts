@@ -3,7 +3,15 @@
 // 文字列の "$N" は、N 番目（0 始まり）の操作が作ったものの ID に置き換える（例: 親を作ってから子を作る）
 
 import { z } from "zod";
-import { createDecision, createLesson, createTask, setDecisionStatus, setMilestone, updateTask } from "./store.ts";
+import {
+  createDecision,
+  createLesson,
+  createTask,
+  setDecisionStatus,
+  setMilestone,
+  updateProject,
+  updateTask,
+} from "./store.ts";
 import { DECISION_STATUSES, LessonInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
 
 const DecisionCreateInput = z.strictObject({
@@ -20,12 +28,18 @@ const DecisionStatusInput = z.strictObject({
   status: z.enum(DECISION_STATUSES),
 });
 
+// プロジェクトの表示名と概要。ダッシュボードの見出しと get_overview に出る。新しいプロジェクトの初期化に使う
+const ProjectInput = z
+  .strictObject({ name: z.string().min(1).optional(), summary: z.string().optional() })
+  .refine((v) => v.name !== undefined || v.summary !== undefined, "name か summary のどちらかが要る");
+
 // 知らない項目は黙って落とさずに断る
 export const BoardOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("create_task"), args: TaskCreateInput.strict() }),
   z.strictObject({ op: z.literal("update_task"), args: TaskUpdateInput.extend({ id: z.string() }).strict() }),
   z.strictObject({ op: z.literal("add_lesson"), args: LessonInput.strict() }),
   z.strictObject({ op: z.literal("set_milestone"), args: MilestoneInput.strict() }),
+  z.strictObject({ op: z.literal("set_project"), args: ProjectInput }),
   z.strictObject({ op: z.literal("create_decision"), args: DecisionCreateInput }),
   z.strictObject({ op: z.literal("set_decision_status"), args: DecisionStatusInput }),
 ]);
@@ -52,6 +66,13 @@ function applyOne(op: BoardOp): string {
     case "set_milestone":
       setMilestone(op.args);
       return op.args.id;
+    case "set_project":
+      updateProject((project) => ({
+        ...project,
+        name: op.args.name ?? project.name,
+        summary: op.args.summary ?? project.summary,
+      }));
+      return "project";
     case "create_decision":
       return `D-${String(createDecision(op.args).number).padStart(4, "0")}`;
     case "set_decision_status":

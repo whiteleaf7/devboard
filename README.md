@@ -24,7 +24,7 @@ Node 24 以上が必要（TypeScript をそのまま実行し、`node:sqlite` �
 | `devboard tailscale [off]`    | Tailscale で公開して URL を出す（`off` で公開をやめる）          |
 | `devboard mcp`                | MCP サーバ（stdio）。`.mcp.json` の `command` に `devboard`、`args` に `["mcp"]` |
 | `devboard show ...`           | ボードを読む（`overview`・`tasks`・`task <ID>`・`decisions`・`decision <番号>`） |
-| `devboard apply '<JSON>'`     | ボードに操作の JSON の配列を当てる（MCP のツールと同じ名前と入力） |
+| `devboard apply '<JSON>'`     | ボードに操作の JSON の配列を当てる（MCP のツールと同じ名前と入力。`set_project` で表示名と概要も書ける） |
 | `devboard recall <質問>`      | 過去のタスク・決定記録・教訓を探す                               |
 | `devboard snapshot <ファイル>` | ボードの写しを SQLite のファイルとして書き出す（バックアップ・複製して試す用） |
 | `devboard tools`              | MCP のツールの名前を JSON の配列で出す（ドキュメントや設定の検査用） |

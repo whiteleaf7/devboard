@@ -63,3 +63,11 @@ test("断られた操作は、何番目かと理由を返す", () => {
     "書き手を変える項目は受け付けない（AI の書き込みとして扱う）",
   );
 });
+
+test("set_project は、表示名と概要を、指した分だけ書き換える", () => {
+  applyOps([{ op: "set_project", args: { name: "新しい製品", summary: "概要" } }]);
+  assert.equal(store.readProject().name, "新しい製品");
+  applyOps([{ op: "set_project", args: { summary: "概要だけ変える" } }]);
+  assert.deepEqual([store.readProject().name, store.readProject().summary], ["新しい製品", "概要だけ変える"]);
+  assert.throws(() => applyOps([{ op: "set_project", args: {} }]), /name か summary/);
+});
