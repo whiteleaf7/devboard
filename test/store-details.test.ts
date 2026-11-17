@@ -50,6 +50,7 @@ test("作成したタスクは既定値を持ち、ボードと作成のイベ�
       milestone: null,
       parent: null,
       dependsOn: [],
+      causedBy: [],
       priority: "normal",
       labels: ["x"],
       paths: [],

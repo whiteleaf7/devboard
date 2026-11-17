@@ -39,6 +39,7 @@ export function ruleProblems(tasks: Task[], milestones: Set<string>): RuleProble
       add("broken-link", `マイルストーン ${task.milestone} が無い`);
     if (task.parent && !byId.has(task.parent)) add("broken-link", `親 ${task.parent} が存在しない`);
     for (const dep of task.dependsOn) if (!byId.has(dep)) add("broken-link", `依存先 ${dep} が存在しない`);
+    for (const cause of task.causedBy) if (!byId.has(cause)) add("broken-link", `原因 ${cause} が存在しない`);
     if (task.dependsOn.includes(task.id) || reaches(task.id, task.dependsOn, (id) => byId.get(id)?.dependsOn ?? []))
       add("broken-link", "依存が循環している");
     if (
@@ -129,8 +130,18 @@ const unverifiedMessage = (): string =>
   "テスト・型チェック・lint・ビルドだけでは足りない。note に「動かした: `コマンド` → 結果」の行を書く" +
   (readConfig().rules.verificationHint || GENERIC_HINT);
 
-// この変更で done になったタスクのうち、動かした結果の無いもの。
-// 振る舞いを変えたかは、予定（paths）と、コミットが実際に変えたファイル（committedFiles）の両方で見る。paths を書かずに閉じても抜けられないように
+// 「見逃した検査: …」の行。不具合を、どの検査が捕まえるはずだったか（足したテスト・筋書きの段・教訓・シナリオ、または足さない理由）
+export const hasMissedCheck = (text: string): boolean => /^[\s>*-]*見逃した検査\s*[:：]\s*\S/m.test(text);
+
+export const BUG_LABEL = "bug";
+export const MISSED_CHECK = "bug-without-missed-check";
+
+const missedCheckMessage =
+  "bug を done にするときは、メモに「見逃した検査: …」の行を書く（足したテスト・筋書きの段・教訓・シナリオのどれか、または足さない理由）。" +
+  "持ち込んだタスクが分かれば causedBy に結ぶ";
+
+// この変更で done になったタスクのうち、閉じ方の決まりに合わないもの。
+// 動かした結果: 振る舞いを変えたかは、予定（paths）と、コミットが実際に変えたファイル（committedFiles）の両方で見る。paths を書かずに閉じても抜けられないように
 export function closingProblems(
   before: Task[],
   after: Task[],
@@ -138,9 +149,22 @@ export function closingProblems(
 ): RuleProblem[] {
   if (readConfig().rules.profile === "none") return [];
   const wasDone = new Set(before.filter((t) => t.status === "done").map((t) => t.id));
-  return after
-    .filter((t) => t.status === "done" && !wasDone.has(t.id))
+  const closed = after.filter((t) => t.status === "done" && !wasDone.has(t.id));
+  const unverified = closed
     .filter((t) => !t.notes.some((note) => hasRunEvidence(note.text)))
     .filter((t) => [...t.paths, ...committedFiles(t.id)].some((path) => !isDocument(path)))
     .map((t) => ({ task: t.id, check: "unverified-done", message: unverifiedMessage() }));
+  const unexplainedBugs = closed
+    .filter((t) => t.labels.includes(BUG_LABEL) && !t.notes.some((note) => hasMissedCheck(note.text)))
+    .map((t) => ({ task: t.id, check: MISSED_CHECK, message: missedCheckMessage }));
+  return [...unverified, ...unexplainedBugs];
+}
+
+// enforce は書き込みを断る。observe は断らずに記録する（新しい決まりは observe で始め、誤検出が無いと分かってから enforce にする）。
+// 名前の無い検査は enforce
+const CHECK_MODES: Record<string, "observe" | "enforce"> = { [MISSED_CHECK]: "observe" };
+
+export function splitByMode(problems: RuleProblem[]): { enforced: RuleProblem[]; observed: RuleProblem[] } {
+  const observing = (p: RuleProblem) => CHECK_MODES[p.check] === "observe";
+  return { enforced: problems.filter((p) => !observing(p)), observed: problems.filter(observing) };
 }

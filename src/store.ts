@@ -2,13 +2,14 @@
 // タスク・教訓・マイルストーンは git の外の SQLite（board-db.ts）、決定記録はリポジトリの決定記録のディレクトリ（decisions.ts）に置く。
 
 import { basename } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
 import type { z } from "zod";
 import { appendEvent, board, eventsOf, write, type BoardEvent } from "./board-db.ts";
 import { readDecisions } from "./decisions.ts";
 import { describeTasks, type TaskView } from "./describe.ts";
 import { committedFiles, readGit } from "./git.ts";
 import { repoRoot } from "./repo-root.ts";
-import { closingProblems, introducedProblems, ruleProblems } from "./rules.ts";
+import { closingProblems, introducedProblems, ruleProblems, splitByMode, type RuleProblem } from "./rules.ts";
 import {
   Lesson,
   LessonInput,
@@ -92,12 +93,11 @@ function assertMilestone(milestone: string | null | undefined): void {
   if (!ids.includes(milestone)) throw new Error(`マイルストーン ${milestone} はボードにない（${ids.join(", ")}）`);
 }
 
-// 親と依存先が存在し、自分自身や循環を指していないことを確かめる。決まりの検査より先に、分かりやすい言葉で断る
+// 親・依存先・原因が存在し、自分自身や循環を指していないことを確かめる。決まりの検査より先に、分かりやすい言葉で断る
 function assertLinks(
   tasks: Task[],
   id: string,
-  parent: string | null | undefined,
-  dependsOn: string[] | undefined,
+  { parent, dependsOn, causedBy }: Pick<TaskPatch, "parent" | "dependsOn" | "causedBy">,
 ): void {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const exists = (x: string) => {
@@ -122,16 +122,31 @@ function assertLinks(
       walk(d);
     }
   }
+  for (const cause of causedBy ?? []) {
+    if (cause === id) throw new Error(`${id} を自分自身の原因にはできない`);
+    exists(cause);
+  }
 }
 
-// 書き込みは、ボードの決まりに新しく反するなら断る。もとからある問題（過去にユーザーが画面から書いたものなど）は problems に出すだけにする
-function assertRules(before: Task[], after: Task[]): void {
+// 書き込みは、ボードの決まりに新しく反するなら断る。もとからある問題（過去にユーザーが画面から書いたものなど）は problems に出すだけにする。
+// observe の決まりに当たったものは断らずに返す（呼び出し側がイベントに残す）
+function checkRules(before: Task[], after: Task[]): RuleProblem[] {
   const milestones = new Set(readProject().milestones.map((m) => m.id));
-  const introduced = [
+  const { enforced, observed } = splitByMode([
     ...introducedProblems(ruleProblems(before, milestones), ruleProblems(after, milestones)),
     ...closingProblems(before, after, committedFiles),
-  ];
-  if (introduced.length) throw new Error(introduced.map((p) => `${p.task}: ${p.message}`).join("\n"));
+  ]);
+  if (enforced.length) throw new Error(enforced.map((p) => `${p.task}: ${p.message}`).join("\n"));
+  return observed;
+}
+
+// 書き込んだタスク。observe の決まりに当たったときだけ observed を付ける（断ってはいないが、書いた本人に見せる）
+export type TaskWrite = Task & { observed?: RuleProblem[] };
+
+function recordObserved(db: DatabaseSync, at: string, task: Task, observed: RuleProblem[]): TaskWrite {
+  for (const { task: subject, check, message } of observed)
+    appendEvent(db, { at, actor: null, kind: "rule.observed", subject, data: { check, message } });
+  return observed.length ? { ...task, observed } : task;
 }
 
 function saveTask(task: Task, number: number): void {
@@ -142,14 +157,14 @@ function saveTask(task: Task, number: number): void {
     .run(task.id, number, JSON.stringify(task));
 }
 
-export function createTask(input: NewTask): Task {
+export function createTask(input: NewTask): TaskWrite {
   assertMilestone(input.milestone);
   const db = board();
   return write(db, () => {
     const { tasks } = readTasks();
     const number = Number(db.prepare("SELECT coalesce(max(number), 0) + 1 AS next FROM tasks").get()?.next);
     const id = padded("T", number);
-    assertLinks(tasks, id, input.parent, input.dependsOn);
+    assertLinks(tasks, id, input);
     const at = now();
     const task = Task.parse({
       id,
@@ -158,6 +173,7 @@ export function createTask(input: NewTask): Task {
       milestone: input.milestone ?? null,
       parent: input.parent ?? null,
       dependsOn: input.dependsOn ?? [],
+      causedBy: input.causedBy ?? [],
       priority: input.priority ?? "normal",
       labels: input.labels ?? [],
       paths: input.paths ?? [],
@@ -168,10 +184,10 @@ export function createTask(input: NewTask): Task {
       created: at,
       updated: at,
     });
-    assertRules(tasks, [...tasks, task]);
+    const observed = checkRules(tasks, [...tasks, task]);
     saveTask(task, number);
     appendEvent(db, { at, actor: "ai", kind: "task.created", subject: id, data: { task } });
-    return task;
+    return recordObserved(db, at, task, observed);
   });
 }
 
@@ -190,13 +206,13 @@ function changesOf(
   );
 }
 
-export function updateTask(id: string, patch: TaskPatch): Task {
+export function updateTask(id: string, patch: TaskPatch): TaskWrite {
   if (patch.milestone !== undefined) assertMilestone(patch.milestone);
   const db = board();
   return write(db, () => {
     const current = getTask(id);
     const { tasks } = readTasks();
-    assertLinks(tasks, id, patch.parent, patch.dependsOn);
+    assertLinks(tasks, id, patch);
     const { note, ...fields } = patch;
     const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     const at = now();
@@ -208,7 +224,7 @@ export function updateTask(id: string, patch: TaskPatch): Task {
       id: current.id,
       updated: at,
     });
-    assertRules(
+    const observed = checkRules(
       tasks,
       tasks.map((t) => (t.id === id ? task : t)),
     );
@@ -218,7 +234,7 @@ export function updateTask(id: string, patch: TaskPatch): Task {
     if (Object.keys(changes).length)
       appendEvent(db, { at, actor: "ai", kind: "task.changed", subject: id, data: { changes } });
     if (added) appendEvent(db, { at, actor: "ai", kind: "task.noted", subject: id, data: { note: added } });
-    return task;
+    return recordObserved(db, at, task, observed);
   });
 }
 

@@ -1,6 +1,8 @@
 // ボードの読み取りクエリ。MCP サーバ（mcp.ts）と CLI（board-cli.ts）の両方が使う。
 
+import { allEvents, board } from "./board-db.ts";
 import { matchLessons } from "./checklist.ts";
+import { escapeSummary } from "./escapes.ts";
 import { boardProblems } from "./lint.ts";
 import {
   describeTasks,
@@ -42,6 +44,7 @@ export function boardOverview() {
     git: s.git,
     errors: s.errors,
     problems: boardProblems(),
+    escapes: escapeSummary(s.tasks, allEvents(board())),
   };
 }
 

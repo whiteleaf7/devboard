@@ -6,6 +6,7 @@ const base = {
   milestone: null,
   labels: [],
   paths: [],
+  causedBy: [],
   description: "",
   branch: null,
   notes: [],

@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { lintDecisions, type BoardFile } from "../src/lint.ts";
-import { closingProblems, hasRunEvidence, introducedProblems, ruleProblems } from "../src/rules.ts";
+import {
+  closingProblems,
+  hasMissedCheck,
+  hasRunEvidence,
+  introducedProblems,
+  ruleProblems,
+  splitByMode,
+} from "../src/rules.ts";
 import { Task } from "../src/schema.ts";
 
 const note = { at: "2026-11-12T00:00:00.000Z", text: "確かめた", by: "ai" };
@@ -37,6 +44,7 @@ test("切れたつながりと循環を見つける", () => {
   assert.deepEqual(checksOf([task("T-001", { parent: "T-009" })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-009"] })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { milestone: "M9" })]), ["broken-link"]);
+  assert.deepEqual(checksOf([task("T-001", { causedBy: ["T-009"] })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-001"] })]), ["broken-link"]);
   assert.deepEqual(checksOf([task("T-001", { dependsOn: ["T-002"] }), task("T-002", { dependsOn: ["T-001"] })]), [
     "broken-link",
@@ -131,6 +139,35 @@ test("振る舞いを変えるタスクを、動かした証拠なしで done �
     closingProblems([], [task("T-001", { status: "done", ...code, notes: [note] })]).length,
     1,
     "作るときに done",
+  );
+});
+
+test("「見逃した検査:」の行に中身があるときだけ、書いたとみなす", () => {
+  const written = ["見逃した検査: 単体テストを足した", "- 見逃した検査：足さない。手でしか再現できない", "経過\n見逃した検査: 教訓 L-012"];
+  for (const text of written) assert.equal(hasMissedCheck(text), true, text);
+  for (const text of ["見逃した検査:", "見逃した検査:   ", "テストを足した", "メモ 見逃した検査: 文の途中"])
+    assert.equal(hasMissedCheck(text), false, text);
+});
+
+test("bug を「見逃した検査」の行なしで done にしたときだけ見つけ、止めずに記録する側に分ける", () => {
+  const closing = (fields: Record<string, unknown>, before = task("T-001", { status: "doing", ...fields })) =>
+    closingProblems([before], [task("T-001", { status: "done", ...fields })]);
+  const bug = { labels: ["bug"] };
+  const missed = { ...note, text: "見逃した検査: 境界のテストを足した" };
+  assert.deepEqual(
+    closing({ ...bug, notes: [note] }).map((p) => p.check),
+    ["bug-without-missed-check"],
+  );
+  assert.deepEqual(closing({ ...bug, notes: [missed, note] }), [], "前のメモに行がある");
+  assert.deepEqual(closing({ labels: ["feature"], notes: [note] }), [], "bug ではない");
+  assert.deepEqual(closing({ ...bug, notes: [note] }, task("T-001", { status: "done", ...bug })), [], "前から done");
+
+  const unverified = { task: "T-002", check: "unverified-done", message: "" };
+  const { enforced, observed } = splitByMode([...closing({ ...bug, notes: [note] }), unverified]);
+  assert.deepEqual(enforced, [unverified]);
+  assert.deepEqual(
+    observed.map((p) => p.check),
+    ["bug-without-missed-check"],
   );
 });
 

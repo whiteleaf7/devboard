@@ -72,3 +72,31 @@ test("親子・依存を検証し、次に着手できるタスクを優先度�
   store.updateTask(a.id, { status: "cancelled", note: "不要になった" });
   assert.ok(ids().includes(b.id), "依存先が中止なら着手できる");
 });
+
+test("原因のタスクは、存在して自分自身でないものだけ結べる", () => {
+  const feature = store.createTask({ title: "機能" });
+  const bug = store.createTask({ title: "不具合", labels: ["bug"], causedBy: [feature.id] });
+  assert.deepEqual(bug.causedBy, [feature.id]);
+  assert.throws(() => store.updateTask(bug.id, { causedBy: ["T-999"] }), /T-999/);
+  assert.throws(() => store.updateTask(bug.id, { causedBy: [bug.id] }), /自分自身/);
+});
+
+test("bug を「見逃した検査」の行なしで done にすると、断らずに記録し、行があれば記録しない", () => {
+  const observedOf = (id: string) => store.taskHistory(id).filter((e) => e.kind === "rule.observed");
+  const silent = store.createTask({ title: "行なし", labels: ["bug"] });
+  const closed = store.updateTask(silent.id, { status: "done", note: "直した" });
+  assert.deepEqual(
+    closed.observed?.map((p) => p.check),
+    ["bug-without-missed-check"],
+  );
+  assert.equal(store.getTask(silent.id).status, "done");
+  assert.deepEqual(
+    observedOf(silent.id).map((e) => [e.actor, e.data]),
+    [[null, { check: "bug-without-missed-check", message: closed.observed?.[0]?.message }]],
+  );
+
+  const explained = store.createTask({ title: "行あり", labels: ["bug"] });
+  const ok = store.updateTask(explained.id, { status: "done", note: "直した\n見逃した検査: 境界のテストを足した" });
+  assert.equal(ok.observed, undefined);
+  assert.deepEqual(observedOf(explained.id), []);
+});

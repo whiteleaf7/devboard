@@ -7,6 +7,7 @@ import { z } from "zod";
 import { milestoneProgress, summarizeActivity, PR_FIELDS, PullRequest, type Activity } from "./activity.ts";
 import { allEvents, board } from "./board-db.ts";
 import { dependencyGraph, type DependencyGraph } from "./dependency-graph.ts";
+import { escapeSummary, type EscapeSummary } from "./escapes.ts";
 import { readDecisions, readProject, readTasks, repoRoot } from "./store.ts";
 
 const run = promisify(execFile);
@@ -60,15 +61,17 @@ export type ActivityResponse = Activity & {
   milestones: ReturnType<typeof milestoneProgress>;
   // マイルストーンの ID ごとの依存関係の図
   dependencies: Record<string, DependencyGraph>;
+  escapes: EscapeSummary;
   sources: { pullRequests: string | null };
 };
 
 export async function loadActivity(days: number, now = new Date()): Promise<ActivityResponse> {
   const [commitTimes, prs] = await Promise.all([readCommitTimes(), readPullRequests()]);
+  const events = allEvents(board());
   const activity = summarizeActivity({
     commitTimes,
     pullRequests: prs.pullRequests,
-    events: allEvents(board()),
+    events,
     decisionDates: readDecisions()
       .map((d) => d.date)
       .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)),
@@ -83,6 +86,7 @@ export async function loadActivity(days: number, now = new Date()): Promise<Acti
     projectName,
     milestones: milestoneProgress(milestones, tasks),
     dependencies: Object.fromEntries(milestones.map((m) => [m.id, dependencyGraph(tasks, m.id)])),
+    escapes: escapeSummary(tasks, events),
     sources: { pullRequests: prs.error },
   };
 }

@@ -98,7 +98,15 @@ export function write<T>(db: DatabaseSync, fn: () => T): T {
   }
 }
 
-export type EventKind = "task.created" | "task.changed" | "task.noted" | "lesson.created" | "lesson.changed" | "project.changed";
+// rule.observed: observe の決まりに当たった書き込み（断らずに記録だけする。rules.ts の CHECK_MODES）
+export type EventKind =
+  | "task.created"
+  | "task.changed"
+  | "task.noted"
+  | "rule.observed"
+  | "lesson.created"
+  | "lesson.changed"
+  | "project.changed";
 export type BoardEvent = {
   seq: number;
   at: string;

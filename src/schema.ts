@@ -34,6 +34,8 @@ export const Task = z.looseObject({
   labels: z.array(z.string()).default([]),
   // 触る予定のパスの接頭辞。並行して着手してよいかの判断に使う
   paths: z.array(z.string()).default([]),
+  // 不具合（labels に bug）のとき、それを持ち込んだ done のタスク。done の後に不具合が出た率を数える（escapes.ts）
+  causedBy: z.array(z.string()).default([]),
   description: z.string().default(""),
   branch: z.string().nullable().default(null),
   notes: z.array(Note).default([]),
@@ -97,6 +99,10 @@ export const TaskCreateInput = z.object({
   branch: z.string().nullable().optional(),
   parent: z.string().nullable().optional().describe("分解元の親タスク ID"),
   dependsOn: z.array(z.string()).optional().describe("先に終わっている必要があるタスク ID（置き換え）"),
+  causedBy: z
+    .array(z.string())
+    .optional()
+    .describe("不具合（labels に bug）のとき、それを持ち込んだタスク ID（置き換え）。done の後に不具合が出た率を数える"),
   priority: Priority.optional().describe("既定は normal"),
 });
 export type NewTask = z.infer<typeof TaskCreateInput>;
@@ -108,7 +114,7 @@ export const TaskUpdateInput = TaskCreateInput.partial().extend({
     .string()
     .optional()
     .describe(
-      "メモの履歴に追記する。経過・判断・次にやること。paths に docs 以外があるタスクを done にするときは「動かした: `コマンド` → 結果」の行を入れる（テストと型チェックだけでは閉じられない）",
+      "メモの履歴に追記する。経過・判断・次にやること。paths に docs 以外があるタスクを done にするときは「動かした: `コマンド` → 結果」の行を入れる（テストと型チェックだけでは閉じられない）。bug のタスクを done にするときは「見逃した検査: …」の行も入れる",
     ),
 });
 

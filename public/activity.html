@@ -142,6 +142,11 @@
     <div class="table-scroll" id="milestones"></div>
   </section>
   <section class="card">
+    <h3>done の後に出た不具合</h3>
+    <p class="caption" id="escapes-caption"></p>
+    <div class="table-scroll" id="escapes"></div>
+  </section>
+  <section class="card">
     <div class="graph-head">
       <div>
         <h3>依存関係</h3>
@@ -413,6 +418,28 @@ function renderMilestones() {
     el("tfoot", {}, cells(total, [total.title]))));
 }
 
+// ---- done の後に出た不具合 ----
+
+function renderEscapes() {
+  const e = data.escapes;
+  const strong = (text) => el("strong", { textContent: text });
+  $("escapes-caption").replaceChildren(
+    "完了 ", strong(num(e.done)), " 件のうち、後から不具合（bug）の原因に結ばれたもの ", strong(num(e.escaped)), " 件",
+    ...(e.rate === null ? [] : ["（", strong(`${(e.rate * 100).toFixed(1)}%`), "）"]),
+    `。原因が結ばれていない不具合 ${num(e.unlinkedBugs.length)} 件、「見逃した検査」の行なしで閉じた不具合 ${num(e.closedWithoutMissedCheck)} 件。いまのタスクの状態で、期間には関係しない`);
+  const ids = (list) => el("span", { className: "id", textContent: list.join(" · ") });
+  const rows = [
+    ...e.links.map((l) => el("tr", {},
+      el("td", { className: "name" }, el("span", { className: "id", textContent: l.bug }), l.title),
+      el("td", {}, ids(l.causes)))),
+    ...(e.unlinkedBugs.length ? [el("tr", {}, el("td", { className: "name", textContent: "原因が未記入" }), el("td", {}, ids(e.unlinkedBugs)))] : []),
+  ];
+  if (!rows.length) return $("escapes").replaceChildren(el("p", { className: "empty", textContent: "不具合のタスクはない" }));
+  $("escapes").replaceChildren(el("table", { className: "grid-table" },
+    el("thead", {}, el("tr", {}, ...["不具合", "持ち込んだタスク"].map((h) => el("th", { textContent: h })))),
+    el("tbody", {}, ...rows)));
+}
+
 // ---- 依存関係の図 ----
 
 const STATUS = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
@@ -587,6 +614,7 @@ function render() {
   $("errors").textContent = data.sources.pullRequests ?? "";
   renderSummary();
   renderMilestones();
+  renderEscapes();
   renderGraph();
   renderTiles();
   renderDaily();
