@@ -1,11 +1,13 @@
 // ボードの読み取りクエリ。MCP サーバ（mcp.ts）と CLI（board-cli.ts）の両方が使う。
 
+import { matchLessons } from "./checklist.ts";
 import { boardProblems } from "./lint.ts";
 import {
   describeTasks,
   getTask,
   nextTasks,
   readDecisions,
+  readLessons,
   readTasks,
   snapshot,
   taskHistory,
@@ -88,7 +90,12 @@ export function boardGetTask(id: string) {
     kind,
     ...(typeof data === "object" && data !== null ? data : {}),
   }));
-  return { ...task, children, history: history.filter((e) => e.kind !== "task.noted") };
+  // 着手のときに、触る範囲に当たる過去の教訓を、探さなくても目に入るようにする
+  const checklist = matchLessons(
+    readLessons().lessons,
+    task.paths.map((path) => ({ path, lines: [] })),
+  );
+  return { ...task, children, checklist, history: history.filter((e) => e.kind !== "task.noted") };
 }
 
 export function boardListDecisions() {

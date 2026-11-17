@@ -12,6 +12,7 @@ import { closingProblems, introducedProblems, ruleProblems } from "./rules.ts";
 import {
   Lesson,
   LessonInput,
+  LessonUpdateInput,
   MilestoneInput,
   Project,
   Task,
@@ -177,7 +178,10 @@ export function createTask(input: NewTask): Task {
 export type TaskPatch = z.infer<typeof TaskUpdateInput>;
 
 // 項目ごとの変更の前後。メモは別のイベントにするので含めない
-function changesOf(before: Task, after: Task): Record<string, { from: unknown; to: unknown }> {
+function changesOf(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Record<string, { from: unknown; to: unknown }> {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)].filter((k) => k !== "notes" && k !== "updated"));
   return Object.fromEntries(
     [...keys]
@@ -269,7 +273,7 @@ export function readLessons(): { lessons: Lesson[]; errors: string[] } {
   return { lessons, errors };
 }
 
-export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
+export function createLesson(input: z.input<typeof LessonInput>): Lesson {
   if (input.task) getTask(input.task);
   const db = board();
   return write(db, () => {
@@ -282,6 +286,7 @@ export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
       fix: input.fix,
       task: input.task ?? null,
       tags: input.tags ?? [],
+      trigger: input.trigger ?? null,
       created: now(),
     });
     db.prepare("INSERT INTO lessons (id, number, data) VALUES (?, ?, ?)").run(
@@ -290,6 +295,23 @@ export function createLesson(input: z.infer<typeof LessonInput>): Lesson {
       JSON.stringify(lesson),
     );
     appendEvent(db, { at: lesson.created, actor: "ai", kind: "lesson.created", subject: lesson.id, data: { lesson } });
+    return lesson;
+  });
+}
+
+export function updateLesson(id: string, patch: z.input<typeof LessonUpdateInput>): Lesson {
+  if (patch.task) getTask(patch.task);
+  const db = board();
+  return write(db, () => {
+    const row = db.prepare("SELECT data FROM lessons WHERE id = ?").get(id);
+    if (!row) throw new Error(`教訓 ${id} は存在しない`);
+    const current = Lesson.parse(JSON.parse(String(row.data)));
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    const lesson = Lesson.parse({ ...current, ...defined, id: current.id });
+    const changes = changesOf(current, lesson);
+    if (!Object.keys(changes).length) return lesson;
+    db.prepare("UPDATE lessons SET data = ? WHERE id = ?").run(JSON.stringify(lesson), id);
+    appendEvent(db, { at: now(), actor: "ai", kind: "lesson.changed", subject: id, data: { changes } });
     return lesson;
   });
 }

@@ -67,6 +67,7 @@ test("ツールの一覧に、ボードを扱うものがそろっている", as
     "open_dashboard",
     "recall",
     "add_lesson",
+    "update_lesson",
   ]) {
     assert.ok(names.includes(name), name);
   }

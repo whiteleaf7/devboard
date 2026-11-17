@@ -45,6 +45,7 @@ AI 自律開発のための開発ボード。タスク・教訓・マイルス�
 - ダッシュボードは読み取り専用。ボードに書けるのは MCP と `devboard apply` だけ。待ち受けは `127.0.0.1` のみ
 - ボードは `~/.devboard/boards/<プロジェクトのディレクトリ名>.sqlite`（`DEVBOARD_DB` で変更可）。プロジェクトの git の外にあり、変更はすべてイベントとして追記する。実験や検証は `devboard snapshot <ファイル>` で写しを取り、`DEVBOARD_DB` をその写しに向けて行う。本物のボードで試さない
 - 決定記録はプロジェクトの `docs/decisions/NNNN-slug.md`
+- 教訓には、差分から読み取れる引き金（`trigger`: 変えたパスの接頭辞 `paths`、変えた行に現れる語 `words`、当たったときに確かめること `check`）を付けられる（`add_lesson`、あとからは `update_lesson`）。当たった教訓だけが、`devboard checklist`（autodev はコミットのときに出す）と、`paths` の重なるタスクの `get_task` の `checklist` に出る。止めはしない
 - `devboard apply` の JSON は、シェルのシングルクォートで囲む。操作の名前と入力は MCP のツールと同じ
 
 ## プロジェクトごとの設定（`.devboard.json`）
@@ -79,6 +80,7 @@ devboard は全プロジェクトで共有するので、プロジェクトの�
 | `devboard show ...`           | ボードを読む（`overview`・`tasks`・`task <ID>`・`decisions`・`decision <番号>`） |
 | `devboard apply '<JSON>'`     | ボードに操作の JSON の配列を当てる（MCP のツールと同じ名前と入力。`set_project` で表示名と概要も書ける） |
 | `devboard recall <質問>`      | 過去のタスク・決定記録・教訓を探す                               |
+| `devboard checklist [パス...]` | 引き金（`trigger`）が当たった教訓と、確かめることを出す。パスが無ければ標準入力の差分（`git diff` の出力）で当てる。当たらなければ何も出さない（`--json` で JSON） |
 | `devboard snapshot <ファイル>` | ボードの写しを SQLite のファイルとして書き出す（バックアップ・複製して試す用） |
 | `devboard tools`              | MCP のツールの名前を JSON の配列で出す（ドキュメントや設定の検査用） |
 | `devboard lint-decisions`     | 標準入力の決定記録（JSON `[{file,text}]`）の形式を検査し、問題を JSON で出す（あれば終了コード 1。CI から使える） |

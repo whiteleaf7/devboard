@@ -64,7 +64,10 @@ export function buildDocs(tasks: Task[], decisions: Decision[], lessons: Lesson[
         id: l.id,
         kind: "lesson",
         title: l.title,
-        body: l.task && sealed.has(l.task) ? SEALED_BODY : [l.problem, l.cause, l.fix, l.tags.join(" ")].join("\n"),
+        body:
+          l.task && sealed.has(l.task)
+            ? SEALED_BODY
+            : [l.problem, l.cause, l.fix, l.trigger?.check ?? "", l.tags.join(" ")].join("\n"),
       }),
     ),
   ];

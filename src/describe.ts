@@ -1,5 +1,6 @@
 // タスクの一覧に、進め方の判断に使う情報（着手できるか、順番、止まっている理由、範囲の重なり）を足す。保存には触らない
 
+import { pathsOverlap } from "./paths.ts";
 import { FINISHED, PRIORITIES, type Priority, type Task, type TaskStatus } from "./schema.ts";
 
 export type TaskView = Task & {
@@ -24,13 +25,10 @@ const ACTIVE: readonly TaskStatus[] = ["todo", "doing"];
 // ユーザーの確認や対応がないと先に進まない状態
 const NEEDS_USER: readonly TaskStatus[] = ["review", "blocked"];
 
-const normalizePath = (path: string) => path.replace(/^\.\//, "").replace(/\/+$/, "");
-const contains = (outer: string, inner: string) => inner === outer || inner.startsWith(`${outer}/`);
-
 // 範囲を書いていないタスクは、どこを触るか分からないので、すべてと重なるものとして扱う
-function pathsOverlap(a: string[], b: string[]): boolean {
+function rangesOverlap(a: string[], b: string[]): boolean {
   if (!a.length || !b.length) return true;
-  return a.map(normalizePath).some((x) => b.map(normalizePath).some((y) => contains(x, y) || contains(y, x)));
+  return a.some((x) => b.some((y) => pathsOverlap(x, y)));
 }
 
 export function describeTasks(tasks: Task[]): TaskView[] {
@@ -95,7 +93,7 @@ export function describeTasks(tasks: Task[]): TaskView[] {
       closable: children.length > 0 && !FINISHED.includes(t.status) && children.every(finished),
       order: order.get(t.id) ?? null,
       overlaps: ACTIVE.includes(t.status)
-        ? doing.filter((d) => d.id !== t.id && pathsOverlap(t.paths, d.paths)).map((d) => d.id)
+        ? doing.filter((d) => d.id !== t.id && rangesOverlap(t.paths, d.paths)).map((d) => d.id)
         : [],
     };
   });

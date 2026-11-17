@@ -18,7 +18,9 @@ import {
   setMilestone,
   MilestoneInput,
   LessonInput,
+  LessonUpdateInput,
   createLesson,
+  updateLesson,
   readLessons,
   readProject,
 } from "./store.ts";
@@ -86,7 +88,7 @@ server.registerTool(
   "get_task",
   {
     description:
-      "タスク 1 件の全項目（説明・メモを含む）と、子タスクの一覧、変更の履歴（history: いつ・誰が（user / ai）・何を変えたか）。ユーザーが変えた状態や優先度を戻す前に history を見る",
+      "タスク 1 件の全項目（説明・メモを含む）と、子タスクの一覧、変更の履歴（history: いつ・誰が（user / ai）・何を変えたか）、paths に引き金が当たった教訓（checklist。着手の前に読む）。ユーザーが変えた状態や優先度を戻す前に history を見る",
     inputSchema: { id: z.string().describe("例: T-001") },
     annotations: { readOnlyHint: true },
   },
@@ -193,10 +195,19 @@ server.registerTool(
   "add_lesson",
   {
     description:
-      "教訓をボードに残す。うまくいかなかったこと、遠回りしたこと、環境の罠と、その対処を書く。次のセッションが recall で引き出す",
+      "教訓をボードに残す。うまくいかなかったこと、遠回りしたこと、環境の罠と、その対処を書く。次のセッションが recall で引き出す。差分から読み取れる引き金（変えたパスや語）があれば trigger を付ける。同じ所を変えたコミットのときと、paths の重なるタスクの get_task に出る",
     inputSchema: LessonInput.shape,
   },
   (input) => tool(() => createLesson(input)),
+);
+
+server.registerTool(
+  "update_lesson",
+  {
+    description: "教訓を直す。指定した項目だけ変わる。あとから引き金（trigger）を付けるときに使う",
+    inputSchema: { id: z.string().describe("例: L-001"), ...LessonUpdateInput.shape },
+  },
+  ({ id, ...patch }) => tool(() => updateLesson(id, patch)),
 );
 
 await server.connect(new StdioServerTransport());

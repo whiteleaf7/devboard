@@ -8,11 +8,12 @@ import {
   createLesson,
   createTask,
   setDecisionStatus,
+  updateLesson,
   setMilestone,
   updateProject,
   updateTask,
 } from "./store.ts";
-import { DECISION_STATUSES, LessonInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
+import { DECISION_STATUSES, LessonInput, LessonUpdateInput, MilestoneInput, TaskCreateInput, TaskUpdateInput } from "./schema.ts";
 
 const DecisionCreateInput = z.strictObject({
   title: z.string().min(1),
@@ -38,6 +39,7 @@ export const BoardOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("create_task"), args: TaskCreateInput.strict() }),
   z.strictObject({ op: z.literal("update_task"), args: TaskUpdateInput.extend({ id: z.string() }).strict() }),
   z.strictObject({ op: z.literal("add_lesson"), args: LessonInput.strict() }),
+  z.strictObject({ op: z.literal("update_lesson"), args: LessonUpdateInput.extend({ id: z.string() }).strict() }),
   z.strictObject({ op: z.literal("set_milestone"), args: MilestoneInput.strict() }),
   z.strictObject({ op: z.literal("set_project"), args: ProjectInput }),
   z.strictObject({ op: z.literal("create_decision"), args: DecisionCreateInput }),
@@ -63,6 +65,10 @@ function applyOne(op: BoardOp): string {
     }
     case "add_lesson":
       return createLesson(op.args).id;
+    case "update_lesson": {
+      const { id, ...patch } = op.args;
+      return updateLesson(id, patch).id;
+    }
     case "set_milestone":
       setMilestone(op.args);
       return op.args.id;

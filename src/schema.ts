@@ -112,8 +112,25 @@ export const TaskUpdateInput = TaskCreateInput.partial().extend({
     ),
 });
 
-// 教訓: うまくいかなかったことと、その対処。似た作業の前に recall で引き出して、同じ失敗を繰り返さないために残す
-export const Lesson = z.object({
+// 教訓を、差分に当たったときだけ出すための引き金（checklist.ts）。覚えていなくても、同じ所を変えたときに思い出せるようにする
+export const LessonTrigger = z
+  .object({
+    paths: z
+      .array(z.string().trim().min(1))
+      .default([])
+      .describe("変えたファイルのパスの接頭辞（例: packages/daemon/src/）"),
+    words: z
+      .array(z.string().trim().min(1))
+      .default([])
+      .describe("変えた行に現れる語（大文字と小文字は区別しない）。paths もあるときは、その下のファイルの行だけを見る"),
+    check: z.string().trim().min(1).describe("当たったときに確かめること"),
+  })
+  .refine((t) => t.paths.length > 0 || t.words.length > 0, "paths か words のどちらかが要る");
+export type LessonTrigger = z.infer<typeof LessonTrigger>;
+
+// 教訓: うまくいかなかったことと、その対処。似た作業の前に recall で引き出して、同じ失敗を繰り返さないために残す。
+// 引き金を書き足すので読んでから書き戻す。古い版のコードが知らない項目を落とさないよう looseObject にする（Task と同じ）
+export const Lesson = z.looseObject({
   id: z.string().regex(/^L-\d{3,}$/),
   title: z.string().min(1),
   problem: z.string().min(1),
@@ -121,9 +138,13 @@ export const Lesson = z.object({
   fix: z.string().min(1),
   task: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
+  trigger: LessonTrigger.nullable().default(null),
   created: z.string(),
 });
 export type Lesson = z.infer<typeof Lesson>;
+
+const triggerDescription =
+  "差分から読み取れる引き金と、当たったときに確かめること。コミットのときに、当たった教訓だけが出る。環境の罠のように差分から読めないものは付けない";
 
 export const LessonInput = z.object({
   title: z.string().trim().min(1).describe("何についての教訓か（1 行）"),
@@ -132,4 +153,9 @@ export const LessonInput = z.object({
   fix: z.string().trim().min(1).describe("どう対処したか。次に同じ場面でどうするか"),
   task: z.string().nullable().optional().describe("関係するタスク ID"),
   tags: z.array(z.string()).optional(),
+  trigger: LessonTrigger.optional().describe(triggerDescription),
+});
+
+export const LessonUpdateInput = LessonInput.partial().extend({
+  trigger: LessonTrigger.nullable().optional().describe(`${triggerDescription}。null で外す`),
 });

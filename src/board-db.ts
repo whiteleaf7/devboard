@@ -98,7 +98,7 @@ export function write<T>(db: DatabaseSync, fn: () => T): T {
   }
 }
 
-export type EventKind = "task.created" | "task.changed" | "task.noted" | "lesson.created" | "project.changed";
+export type EventKind = "task.created" | "task.changed" | "task.noted" | "lesson.created" | "lesson.changed" | "project.changed";
 export type BoardEvent = {
   seq: number;
   at: string;
