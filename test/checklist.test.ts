@@ -153,3 +153,10 @@ test("devboard checklist は、標準入力の差分かパスに当たった教�
   const miss = checklistCli([], "diff --git a/README.md b/README.md\n@@ -1 +1 @@\n+x\n");
   assert.deepEqual([miss.code, miss.out], [0, ""]);
 });
+
+test("大きな差分も、標準入力から読み切る", () => {
+  const big = `diff --git a/a.ts b/a.ts\n@@ -0,0 +1 @@\n${"+const filler = 1;\n".repeat(400_000)}+readline\n`;
+  const result = checklistCli(["--json"], big);
+  assert.equal(result.code, 0, result.err);
+  assert.ok((JSON.parse(result.out) as { lessons: unknown[] }).lessons.length > 0);
+});
