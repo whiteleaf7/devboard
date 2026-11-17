@@ -1,3 +1,7 @@
 node_modules/
 .dev/
 .DS_Store
+
+# 作業用の worktree（git worktree add .worktrees/...）
+.worktrees/
+.claude/worktrees/
