@@ -50,8 +50,17 @@
   .row .note-line { grid-area: note; color: var(--sub); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .row.cancelled { opacity: 0.55; }
   .row.cancelled .title { text-decoration: line-through; }
-  .groups.focusing .row:not(.self, .related) { opacity: 0.35; }
-  .groups.focusing .row.related { background: color-mix(in srgb, var(--doing) 8%, transparent); }
+  /* マウスを乗せた行とつながるタスクの行。ほかの行は薄くしない（動かすたびに一覧全体がちらつくため） */
+  .row.related { background: color-mix(in srgb, var(--doing) 7%, transparent); box-shadow: inset 3px 0 0 var(--doing); }
+  .hovercard { position: fixed; z-index: 10; width: max-content; max-width: min(480px, 90vw); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); padding: 8px 12px 10px; font-size: 12px; pointer-events: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .hovercard section { min-width: 0; }
+  .hovercard h5 { margin: 0 0 3px; font-size: 11px; color: var(--sub); font-weight: 600; }
+  .hovercard .item { display: flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.6; }
+  .hovercard .item::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--c); align-self: center; }
+  .hovercard .id { flex: none; font-family: ui-monospace, monospace; color: var(--sub); }
+  .hovercard .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .hovercard .st { flex: none; color: var(--c); }
+  .hovercard .more { color: var(--sub); padding-left: 12px; }
   .tag.high { color: var(--blocked); border-color: var(--blocked); }
   .tag.wait { color: var(--review); border-color: var(--review); }
   .tag.blocking { color: var(--doing); border-color: var(--doing); }
@@ -398,6 +407,62 @@ function pager(key, size, { shown, rest }) {
   return buttons.length ? [el("div", { className: "pager" }, ...buttons)] : [];
 }
 
+// 行にマウスを止めると、つながるタスクの行に印を付け、行の下にその一覧を出す。
+// 印を付ける行が畳んだグループや「さらに表示」の先にあっても、一覧のほうで分かる
+const HOVER_DELAY = 250;
+const HOVER_LIST_MAX = 6;
+let hovered = null; // マウスを乗せているタスクの ID。描き直しても保つ
+let hoverTimer = 0;
+const hoverCard = el("div", { className: "hovercard", role: "tooltip", hidden: true });
+document.body.append(hoverCard);
+window.addEventListener("scroll", () => { hoverCard.hidden = true; }, { passive: true });
+
+const relationsOf = (t) => [
+  ["親タスク", t.parent ? [t.parent] : []],
+  ["子タスク", t.children],
+  ["依存", t.dependsOn],
+  ["待っているタスク", dependentsOf(t.id).map((d) => d.id)],
+].filter(([, ids]) => ids.length);
+
+function hoverItem(id) {
+  const t = data.tasks.find((x) => x.id === id);
+  return el("div", { className: "item", style: statusColor(t?.status ?? "todo") },
+    el("span", { className: "id", textContent: id }),
+    el("span", { className: "name", textContent: t ? t.title : "（見つからない）" }),
+    ...(t ? [el("span", { className: "st", textContent: STATUS_LABEL[t.status] })] : []));
+}
+
+function markRelated() {
+  const board = $("board");
+  for (const r of board.querySelectorAll(".row.related")) r.classList.remove("related");
+  hoverCard.hidden = true;
+  const t = hovered && data.tasks.find((x) => x.id === hovered);
+  const row = t && board.querySelector(`.row[data-id="${t.id}"]`);
+  const relations = t ? relationsOf(t) : [];
+  if (!row || !relations.length) return;
+  const ids = new Set(relations.flatMap(([, ids]) => ids));
+  for (const r of board.querySelectorAll(".row")) if (ids.has(r.dataset.id)) r.classList.add("related");
+
+  hoverCard.replaceChildren(...relations.map(([label, ids]) => el("section", {},
+    el("h5", { textContent: `${label}${ids.length > 1 ? ` ${ids.length}` : ""}` }),
+    ...ids.slice(0, HOVER_LIST_MAX).map(hoverItem),
+    ...(ids.length > HOVER_LIST_MAX ? [el("div", { className: "more", textContent: `ほか ${ids.length - HOVER_LIST_MAX} 件` })] : []))));
+  hoverCard.hidden = false;
+  // 行の下に出す。下に入りきらなければ上に出す
+  const r = row.getBoundingClientRect();
+  const left = row.querySelector(".title").getBoundingClientRect().left;
+  const { width, height } = hoverCard.getBoundingClientRect();
+  hoverCard.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
+  hoverCard.style.top = `${r.bottom + 4 + height <= innerHeight ? r.bottom + 4 : Math.max(8, r.top - height - 4)}px`;
+}
+
+function hover(id) {
+  hovered = id;
+  clearTimeout(hoverTimer);
+  if (id) hoverTimer = setTimeout(markRelated, HOVER_DELAY);
+  else markRelated();
+}
+
 function render() {
   const { project, tasks, decisions, git, errors } = data;
   $("name").textContent = project.name;
@@ -441,24 +506,7 @@ function render() {
     if (FINISHED.includes(t.status)) continue;
     for (const w of t.waitingOn) waiters.set(w.id, [...(waiters.get(w.id) ?? []), t.id]);
   }
-  // 行に乗せたときに浮かせる、つながりのあるタスク
-  const relatedOf = (t) => new Set([t.parent, ...t.children, ...t.dependsOn, ...dependentsOf(t.id).map((d) => d.id)].filter(Boolean));
-
   const board = $("board");
-  const clearFocus = () => {
-    board.classList.remove("focusing");
-    for (const r of board.querySelectorAll(".row.self, .row.related")) r.classList.remove("self", "related");
-  };
-  const focusRelated = (t) => {
-    clearFocus();
-    const related = relatedOf(t);
-    const rows = [...board.querySelectorAll(".row")].filter((r) => related.has(r.dataset.id));
-    if (!rows.length) return;
-    board.classList.add("focusing");
-    board.querySelector(`.row[data-id="${t.id}"]`)?.classList.add("self");
-    for (const r of rows) r.classList.add("related");
-  };
-
   const tag = (text, className = "", title = "") => el("span", { className: `tag ${className}`.trim(), textContent: text, title });
   const tagsOf = (t) => {
     const done = t.children.filter(isFinished).length;
@@ -497,16 +545,15 @@ function render() {
     );
     row.querySelector("time").dataset.at = t.updated;
     row.dataset.id = t.id;
-    row.onclick = () => showTask(t.id);
-    row.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showTask(t.id); } };
-    row.onmouseenter = () => focusRelated(t);
-    row.onmouseleave = clearFocus;
+    row.onclick = () => { hover(null); showTask(t.id); };
+    row.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hover(null); showTask(t.id); } };
+    row.onmouseenter = (e) => { if (e.buttons === 0) hover(t.id); };
+    row.onmouseleave = () => hover(null);
     return row;
   };
 
   const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
   const inGroupOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
-  board.classList.remove("focusing");
   board.replaceChildren(...GROUPS.map(([status, label]) => {
     // 未着手は着手する順（order）。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く。
     // 完了・中止は新しい順。ほかは優先のものを先に、新しい順
@@ -549,6 +596,9 @@ function render() {
     : [el("li", { textContent: "コミットなし" })]));
 
   // 表示中のタスクを AI が更新したら、開いたまま中身を差し替える
+  // AI の更新で描き直しても、マウスを乗せている行の印と一覧を消さない
+  if (hovered) markRelated();
+
   const viewed = tasks.find((t) => t.id === viewing);
   if (viewed) renderTaskView(viewed);
 }
