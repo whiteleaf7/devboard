@@ -622,23 +622,34 @@ function render() {
   renderPullRequests();
 }
 
-// 読み込み中は前の図を薄く残し、レイアウトを動かさない
-let requested = 0;
+// 読み込みは同時に 1 つだけにする。読み込み中に届いた変更の通知はまとめ、終わってから 1 回だけ読み直す。
+// 通知のたびに読み込み中のものを捨てると、ボードが変わり続ける間（AI の作業中）は一度も描けない
+let inFlight = false;
+let again = false;
 async function load() {
-  const id = ++requested;
-  $("content").classList.add("loading");
+  if (inFlight) { again = true; return; }
+  inFlight = true;
+  const asked = days;
+  // 選んだ期間の図がまだ無いときだけ、前の図を薄く残してレイアウトを動かさない。変更の通知での読み直しは薄くしない
+  if (data?.range.days !== asked) $("content").classList.add("loading");
   try {
-    const res = await fetch(`/api/activity?days=${days}`);
+    const res = await fetch(`/api/activity?days=${asked}`);
     if (!res.ok) throw new Error(await res.text());
     const next = await res.json();
-    if (id !== requested) return;
-    data = next;
-    render();
+    // 読み込みの間に期間を変えたら、古い期間の結果は描かずに読み直す
+    if (asked === days) {
+      data = next;
+      render();
+    } else again = true;
   } catch (err) {
     $("errors").textContent = `活動を読み込めない: ${err.message}`;
   } finally {
-    if (id === requested) $("content").classList.remove("loading");
+    inFlight = false;
   }
+  if (again) {
+    again = false;
+    load();
+  } else $("content").classList.remove("loading");
 }
 
 function listen() {
