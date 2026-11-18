@@ -407,12 +407,10 @@ function pager(key, size, { shown, rest }) {
   return buttons.length ? [el("div", { className: "pager" }, ...buttons)] : [];
 }
 
-// 行にマウスを止めると、つながるタスクの行に印を付け、行の下にその一覧を出す。
+// 行にマウスを乗せると、つながるタスクの行に印を付け、行の下にその一覧を出す。
 // 印を付ける行が畳んだグループや「さらに表示」の先にあっても、一覧のほうで分かる
-const HOVER_DELAY = 250;
 const HOVER_LIST_MAX = 6;
 let hovered = null; // マウスを乗せているタスクの ID。描き直しても保つ
-let hoverTimer = 0;
 const hoverCard = el("div", { className: "hovercard", role: "tooltip", hidden: true });
 document.body.append(hoverCard);
 window.addEventListener("scroll", () => { hoverCard.hidden = true; }, { passive: true });
@@ -458,9 +456,7 @@ function markRelated() {
 
 function hover(id) {
   hovered = id;
-  clearTimeout(hoverTimer);
-  if (id) hoverTimer = setTimeout(markRelated, HOVER_DELAY);
-  else markRelated();
+  markRelated();
 }
 
 function render() {
