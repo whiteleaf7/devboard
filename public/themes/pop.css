@@ -1,0 +1,162 @@
+/* テーマ: ポップ。丸ゴシックとパステルのステッカー。字はいつも濃い色で、地は明るい色にする */
+:root[data-theme="pop"] {
+  --bg: #fff4d1; --ink: #23202e; --white: #fff; --pink: #ff8fbd; --mint: #7ee3c6; --sky: #98ceff; --sun: #ffd84a; --lilac: #cdb9ff; --sub: #5d5870;
+  --round: "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif;
+  --display: "Arial Rounded MT Bold", "Hiragino Maru Gothic ProN", sans-serif;
+  font-family: var(--round); color: var(--ink); background: var(--bg);
+
+  /* 背景: 水玉 */
+  .bg { background: var(--bg); }
+  .bg i { background:
+    radial-gradient(circle, rgba(255, 143, 189, .3) 3px, transparent 3.5px) 0 0 / 34px 34px,
+    radial-gradient(circle, rgba(152, 206, 255, .35) 3px, transparent 3.5px) 17px 17px / 34px 34px; }
+
+  /* ヘッダー */
+  .top { padding: 18px 40px; background: var(--white); border-bottom: 3px solid var(--ink); }
+  .logo { display: flex; gap: 6px; }
+  .logo span { display: grid; place-items: center; width: 50px; height: 50px; border: 3px solid var(--ink); border-radius: 50%;
+    font-family: var(--display); font-size: 1.6rem; box-shadow: 3px 3px 0 var(--ink);
+    animation: bob 2.4s ease-in-out infinite; animation-delay: calc(var(--k, 0) * .15s); }
+  .logo span:nth-child(4n+1) { background: var(--pink); }
+  .logo span:nth-child(4n+2) { background: var(--sun); }
+  .logo span:nth-child(4n+3) { background: var(--mint); }
+  .logo span:nth-child(4n) { background: var(--sky); }
+  .branch { font-family: ui-monospace, monospace; font-size: .85rem; font-weight: 700; background: var(--lilac); border: 3px solid var(--ink); border-radius: 999px; padding: 4px 14px; }
+  .branch em { font-style: normal; font-family: var(--round); margin-left: 8px; background: var(--white); border: 2px solid var(--ink); border-radius: 999px; padding: 0 8px; }
+  .live { font-family: var(--display); background: var(--pink); border: 3px solid var(--ink); border-radius: 999px; padding: 4px 14px; }
+  .live::before { content: "● "; animation: blink 1.2s steps(2) infinite; }
+  .clock { font-family: var(--display); font-size: 2.4rem; }
+  .clock small { font-size: .9rem; color: var(--sub); margin-left: 8px; }
+
+  /* 数の帯 */
+  .stats { gap: 14px; padding: 24px 40px 0; }
+  .stat { display: flex; align-items: center; gap: 10px; border: 3px solid var(--ink); border-radius: 22px; padding: 6px 20px; background: var(--white); box-shadow: 4px 4px 0 var(--ink); }
+  .stat b { font-family: var(--display); font-size: 2.4rem; }
+  .stat span { font-weight: 800; font-size: .9rem; }
+  .stat.hot { background: var(--pink); }
+  .stat.warn { background: var(--sun); }
+  .stat:nth-child(3) { background: var(--sky); }
+  .stat.dim { background: var(--mint); }
+
+  main { padding-inline: 40px; }
+
+  /* 見出し: 和文を大きく、欧文は小さな札に */
+  .h { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; }
+  .h small { order: 1; font-size: 1.6rem; font-weight: 800; }
+  .h b { order: 2; font-family: var(--display); font-size: .85rem; background: var(--ink); color: var(--white); border-radius: 999px; padding: 4px 12px; letter-spacing: .08em; }
+  .h .n { order: 3; font-family: var(--display); font-size: 1.2rem; background: var(--sun); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px; }
+
+  /* カードの共通の形 */
+  .op .face, .ms, .check, .file, .queue .plate, .tile { border: 3px solid var(--ink); border-radius: 22px; background: var(--white); box-shadow: 5px 5px 0 var(--ink); }
+
+  /* 進行中 */
+  .now-list { gap: 28px; }
+  .op .face { overflow: hidden; padding-bottom: 20px; }
+  .op .face > div:first-of-type { background: var(--pink); padding: 12px 20px; border-bottom: 3px solid var(--ink); }
+  .op:nth-child(even) .face > div:first-of-type { background: var(--sky); }
+  .op .bigid { display: none; }
+  .op .stamp { background: var(--white); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 10px; font-weight: 800; margin-right: 8px; }
+  .chip { font-size: .78rem; font-weight: 700; border: 2px solid var(--ink); border-radius: 999px; padding: 1px 9px; background: var(--white); }
+  .chip.solid { background: var(--sun); }
+  .kids i { width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 50%; background: var(--white); }
+  .kids i.on { background: var(--mint); }
+  .op h3 { font-size: 1.7rem; font-weight: 800; margin: 16px 22px 14px; line-height: 1.4; }
+  .op .crumb { display: block; font-size: .9rem; color: var(--sub); }
+  .bubble { position: relative; margin: 0 22px; background: var(--sun); border: 3px solid var(--ink); border-radius: 18px; padding: 12px 16px; font-weight: 700; line-height: 1.6; }
+  .bubble::after { content: ""; position: absolute; left: 28px; bottom: -13px; width: 20px; height: 20px; background: var(--sun);
+    border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); rotate: 45deg; }
+  .op .foot { display: flex; align-items: center; gap: 10px; margin: 22px 22px 0; font-size: .85rem; }
+  .op .foot .br { font-family: ui-monospace, monospace; background: var(--lilac); border: 2px solid var(--ink); border-radius: 999px; padding: 1px 10px; }
+  .op .foot time { margin-left: auto; font-weight: 800; }
+
+  /* マイルストーン */
+  .ms-list { gap: 16px; }
+  .ms { padding: 14px 18px; }
+  .ms.active { background: #ffe3ef; }
+  .ms.done { background: #e9fbf5; }
+  .ms .row1 { display: flex; align-items: baseline; gap: 10px; }
+  .ms .mid { font-family: var(--display); font-size: 1.3rem; background: var(--ink); color: var(--white); border-radius: 12px; padding: 2px 10px; }
+  .ms .title { font-weight: 800; }
+  .ms .state { font-size: .75rem; font-weight: 800; border: 2px solid; border-radius: 999px; padding: 0 8px; }
+  .ms .pct { margin-left: auto; font-family: var(--display); font-size: 2rem; }
+  .ms .goal { font-size: .85rem; color: var(--sub); margin: 6px 0 10px; }
+  .segs { gap: 5px; }
+  .segs i { flex: 1; height: 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--white); }
+  .segs i.done { background: var(--mint); }
+  .segs i.doing { background: repeating-linear-gradient(-45deg, var(--pink) 0 4px, var(--white) 4px 8px); background-size: 11.3px 11.3px; animation: march 1s linear infinite; }
+
+  /* 確認待ち・止まっている */
+  .check { background: var(--sky); padding: 18px; }
+  .hazard { padding: 10px; border-radius: 22px; border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
+    background: repeating-linear-gradient(-45deg, var(--sun) 0 14px, var(--ink) 14px 28px); }
+  .hazard .face { background: var(--white); border: 3px solid var(--ink); border-radius: 14px; padding: 16px; }
+  .check .label, .hazard .label { font-weight: 800; font-size: 1.4rem; }
+  .check .label::before { content: "みてほしい！"; }
+  .hazard .label::before { content: "ストップ中…"; }
+  .check .seal { position: absolute; right: -10px; top: -16px; width: 78px; height: 78px; border-radius: 50%; background: var(--pink); border: 3px solid var(--ink);
+    display: grid; place-items: center; rotate: 12deg; font-weight: 800; font-size: .8rem; text-align: center; box-shadow: 3px 3px 0 var(--ink); white-space: pre; }
+  .check .seal::before { content: "チェック\Aして！"; }
+  .card-id { font-family: var(--display); font-size: .9rem; color: var(--sub); margin-top: 6px; }
+  .card-title { font-size: 1.2rem; font-weight: 800; line-height: 1.45; margin: 4px 0 10px; }
+  .reason { font-size: .92rem; font-weight: 700; background: rgba(255, 255, 255, .7); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; line-height: 1.6; }
+  .hazard .reason { background: #fff1c2; }
+
+  /* 次にやる順 */
+  .queue { gap: 14px; }
+  .queue li { grid-template-columns: 56px 1fr auto; }
+  .queue .num { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--ink); display: grid; place-items: center; font-family: var(--display); font-size: 1.3rem; background: var(--white); }
+  .queue .plate { position: relative; padding: 10px 16px; }
+  .queue .plate .t { display: block; font-weight: 800; }
+  .queue .plate .m { font-size: .78rem; color: var(--sub); font-family: ui-monospace, monospace; }
+  .queue li.first .num { background: var(--pink); }
+  .queue li.first .plate { background: var(--pink); }
+  .queue li.first .plate::after { content: "つぎこれ！"; position: absolute; right: 16px; top: -15px; background: var(--sun); border: 2px solid var(--ink); border-radius: 999px; padding: 1px 10px; font-size: .78rem; font-weight: 800; }
+  .burst:not(:empty) { margin-left: 10px; width: 56px; height: 56px; display: grid; place-items: center; background: var(--sun); font-size: .75rem; font-weight: 800; rotate: 12deg;
+    clip-path: polygon(50% 0, 61% 26%, 90% 10%, 76% 38%, 100% 50%, 76% 62%, 90% 90%, 61% 74%, 50% 100%, 39% 74%, 10% 90%, 24% 62%, 0 50%, 24% 38%, 10% 10%, 39% 26%); }
+  .queue li.low .plate { background: #f4f1ea; color: var(--sub); }
+  .queue li:hover { translate: 6px 0; }
+
+  /* 終わったもの */
+  .cleared { gap: 18px; }
+  .tile { padding: 14px 16px 46px; min-height: 124px; background: #e9fbf5; }
+  .tile.cancelled { background: #eeeaf2; }
+  .tile .card-id { font-family: var(--display); color: var(--sub); font-size: .85rem; }
+  .tile .tt { font-weight: 800; margin-top: 4px; line-height: 1.45; font-size: .95rem; }
+  .tile time { position: absolute; left: 16px; bottom: 12px; font-size: .78rem; color: var(--sub); }
+  .tile .seal { position: absolute; right: 12px; bottom: 10px; background: var(--mint); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 10px; font-weight: 800; font-size: .8rem; rotate: -6deg; }
+  .tile.done .seal::before { content: "できた！"; }
+  .tile.cancelled .seal { background: #ddd8e4; }
+  .tile.cancelled .seal::before { content: "やめた"; }
+  .tile.cancelled .tt { text-decoration: line-through; color: var(--sub); }
+
+  /* 決定記録 */
+  .file { padding: 18px; margin-top: 18px; }
+  .file::before { content: ""; position: absolute; top: -18px; left: 18px; width: 90px; height: 18px; background: var(--sky);
+    border: 3px solid var(--ink); border-bottom: 0; border-radius: 10px 10px 0 0; }
+  .file .no { font-family: var(--display); font-size: .9rem; color: var(--sub); }
+  .file .ft { font-weight: 800; font-size: 1.05rem; line-height: 1.5; margin: 6px 0 10px; }
+  .file .fm { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; }
+  .file .chip.solid { background: var(--mint); }
+  .op:hover, .check:hover, .file:hover, .tile:hover { translate: 0 -4px; }
+
+  /* コミット */
+  .ticker { background: var(--ink); color: var(--white); }
+  .ticker .tag { background: var(--pink); color: var(--ink); font-family: var(--display); border-radius: 0 999px 999px 0; }
+  .ticker .track span { font-size: .9rem; }
+  .ticker .track span b { color: var(--sun); font-family: ui-monospace, monospace; margin-right: 8px; }
+  .ticker .track span::after { content: "★"; color: var(--pink); padding-left: 30px; }
+
+  .rise { animation: pop-up .6s cubic-bezier(.3, 1.8, .5, 1) both; animation-delay: calc(var(--d, 0) * 70ms); }
+
+  /* 終わったときの演出: 紙吹雪とステッカー */
+  .cutin { background-color: rgba(255, 244, 209, .7);
+    background-image: radial-gradient(circle, var(--pink) 6px, transparent 7px), radial-gradient(circle, var(--sky) 6px, transparent 7px), radial-gradient(circle, var(--mint) 5px, transparent 6px);
+    background-size: 90px 90px, 90px 90px, 70px 70px; background-position: 0 0, 45px 45px, 20px 10px; }
+  .cutin.show { animation: confetti 2.4s linear both; }
+  .cutin .band { position: absolute; left: 50%; top: 50%; translate: -50% -50%; background: var(--white); border: 4px solid var(--ink); border-radius: 32px;
+    box-shadow: 8px 8px 0 var(--ink); padding: 30px 44px; text-align: center; animation: pop 2.4s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .cutin .word { display: block; font-family: var(--display); font-size: 4.6rem; font-weight: 800; color: var(--pink); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+  .cutin .word::before { content: "やったー！"; }
+  .cutin .what { display: block; margin-top: 12px; font-size: 1.3rem; font-weight: 800; }
+  .cutin .what b { display: inline-block; background: var(--sun); border: 2px solid var(--ink); border-radius: 999px; padding: 0 10px; margin-right: 8px; font-family: var(--display); }
+}

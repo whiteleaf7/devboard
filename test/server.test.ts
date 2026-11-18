@@ -89,3 +89,20 @@ test("活動の画面と集計を返し、期間の指定が不正なら 400 で
   assert.equal(bad.status, 400);
   assert.match(await bad.text(), /days/);
 });
+
+test("設定で選べるテーマは、どれも CSS を返し、ボードの画面が読み込む", async () => {
+  const themeJs = await (await fetch(`${base}/theme.js`)).text();
+  const ids = [...themeJs.matchAll(/\{ id: "([a-z-]+)"/g)].map((m) => m[1] ?? "");
+  assert.ok(ids.includes("business"), "既定の業務テーマがある");
+  const index = await (await fetch(`${base}/`)).text();
+  assert.equal((await fetch(`${base}/board.css`)).status, 200);
+  for (const id of ids) {
+    const res = await fetch(`${base}/themes/${id}.css`);
+    assert.equal(res.status, 200, id);
+    assert.match(await res.text(), new RegExp(`:root\\[data-theme="${id}"\\]`), `${id} はテーマの中に閉じている`);
+    assert.ok(index.includes(`href="/themes/${id}.css"`), `${id} を読み込む`);
+  }
+  // public/themes/ に無い名前は返さない
+  for (const path of ["/themes/nope.css", "/themes/business.css.map", "/themes/%2E%2E%2Fbase.css"])
+    assert.equal((await fetch(base + path)).status, 404, path);
+});

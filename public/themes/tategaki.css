@@ -1,0 +1,156 @@
+/* テーマ: 縦書き。和紙に墨と朱。ページごと縦書きにして、右から左へ読み進める */
+:root[data-theme="tategaki"] {
+  --washi: #f4efe2; --sumi: #1f1d1a; --usuzumi: #615b51; --shu: #b5341f; --line: #1f1d1a;
+  --mincho: "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --gothic: "Hiragino Sans", sans-serif;
+  font-family: var(--mincho); color: var(--sumi); background: var(--washi);
+
+  /* 題字・数・本文をまとめた箱を縦書きにし、画面の大きさのまま横へ送る。外側（流れるコミット・演出）は横書きのまま */
+  .page { writing-mode: vertical-rl; width: 100vw; height: 100vh; overflow-x: auto; overflow-y: hidden; padding-bottom: 52px; }
+
+  /* 背景: 和紙の繊維 */
+  .bg { background: var(--washi); }
+  .bg i { background:
+    repeating-linear-gradient(83deg, rgba(120, 100, 70, .05) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(-71deg, rgba(120, 100, 70, .04) 0 1px, transparent 1px 21px); }
+
+  /* 題字の列: いちばん右 */
+  .top { padding: 40px 26px; gap: 22px; border-left: 3px double var(--line); }
+  .logo { font-size: 2.4rem; font-weight: 700; text-orientation: upright; letter-spacing: .08em; }
+  .logo::after { content: "開発帳"; display: block; margin-top: 14px; font-size: 1.1rem; color: var(--shu); letter-spacing: .3em; }
+  .branch { font-family: var(--gothic); font-size: .8rem; color: var(--usuzumi); }
+  .branch em { font-style: normal; color: var(--shu); margin-top: 10px; display: inline-block; }
+  .live { font-family: var(--gothic); font-size: .78rem; letter-spacing: .3em; color: var(--shu); }
+  .live::before { content: "●"; animation: blink 2s steps(2) infinite; }
+  .clock { font-size: 1.5rem; font-weight: 700; }
+  .clock small { font-size: .8rem; color: var(--usuzumi); margin-top: 8px; display: inline-block; }
+
+  /* 数の列 */
+  .stats { padding: 40px 20px; gap: 22px; border-left: 1px solid var(--line); }
+  .stat { display: flex; align-items: center; gap: 8px; }
+  .stat b { font-size: 2rem; font-weight: 700; text-orientation: upright; letter-spacing: -.05em; }
+  .stat span { font-size: .9rem; font-weight: 700; }
+  .stat.hot b { color: var(--shu); }
+  .stat.dim { color: var(--usuzumi); }
+
+  /* 本文: 段が右から左へ並ぶ */
+  main { display: flex; flex-direction: column; gap: 40px; padding: 40px 36px; max-width: none; }
+  main > section, main > aside { border-left: 1px solid var(--line); padding-left: 36px; }
+
+  /* 見出し: 右に朱の線 */
+  .h { display: flex; align-items: center; gap: 12px; margin-left: 20px; border-right: 4px solid var(--shu); padding-right: 10px; }
+  .h b { display: none; }
+  .h small { font-size: 1.6rem; font-weight: 700; letter-spacing: .15em; }
+  .h .n { font-size: 1.1rem; color: var(--shu); text-combine-upright: all; }
+
+  /* 進行中 */
+  .now-list { gap: 30px; }
+  .op + .op { border-right: 1px solid var(--line); padding-right: 30px; }
+  .op .face { display: flex; flex-direction: column; gap: 4px; }
+  .op .bigid { display: none; }
+  .op .stamp { font-family: var(--gothic); font-size: .78rem; border: 1px solid var(--sumi); padding: 6px 1px; margin-bottom: 8px; display: inline-block; }
+  .op h3 { font-size: 2rem; font-weight: 700; line-height: 1.5; margin: 0 12px; letter-spacing: .06em; }
+  .op:nth-child(n+2) h3 { font-size: 1.5rem; }
+  .op .crumb { display: block; font-size: .95rem; color: var(--shu); }
+  .bubble { font-size: 1.05rem; line-height: 1.9; padding: 12px 10px; margin: 0 8px; border-right: 3px solid var(--shu); background: rgba(181, 52, 31, .05); }
+  .bubble::before { content: "【経過】"; font-weight: 700; }
+  .op .foot { display: flex; gap: 14px; font-family: var(--gothic); font-size: .78rem; color: var(--usuzumi); }
+  .op .foot time { margin-top: auto; }
+  .chip { font-family: var(--gothic); font-size: .75rem; color: var(--usuzumi); }
+  .chip + .chip::before { content: "・"; }
+  .chip.solid { color: var(--shu); font-weight: 700; }
+  .kids i { inline-size: 8px; block-size: 8px; border: 1px solid var(--sumi); border-radius: 50%; }
+  .kids i.on { background: var(--sumi); }
+
+  /* マイルストーン: 縦の目盛り */
+  .ms-list { gap: 0; }
+  .ms { padding: 0 14px; }
+  .ms + .ms { border-right: 1px solid var(--line); }
+  .ms.done { color: var(--usuzumi); }
+  .ms .row1 { display: flex; align-items: center; gap: 10px; }
+  .ms .mid { font-size: 1.3rem; font-weight: 700; text-orientation: upright; }
+  .ms.active .mid { color: var(--shu); }
+  .ms .title { font-weight: 700; font-size: 1.1rem; letter-spacing: .05em; }
+  .ms .state { font-family: var(--gothic); font-size: .72rem; border: 1px solid; padding: 4px 1px; }
+  .ms.active .state { color: var(--shu); }
+  .ms .pct { margin-top: auto; font-size: 1.5rem; font-weight: 700; text-orientation: upright; letter-spacing: -.05em; }
+  .ms .pct small { font-size: .9rem; }
+  .ms .goal { font-size: .85rem; color: var(--usuzumi); margin: 0 6px; line-height: 1.7; }
+  .segs { gap: 3px; }
+  .segs i { flex: 1; block-size: 8px; background: #ddd5c4; }
+  .segs i.done { background: var(--sumi); }
+  .segs i.doing { background: var(--shu); }
+  .ms.done .segs i.done { background: var(--usuzumi); }
+
+  /* 確認待ち・止まっている: 上下に並ぶ囲み */
+  .alert-list { gap: 24px; }
+  .check { border: 1px solid var(--line); padding: 18px 14px 80px; }
+  .hazard { border: 3px double var(--shu); padding: 18px 14px; }
+  .check .label, .hazard .label { font-weight: 700; font-size: .95rem; letter-spacing: .1em; color: var(--usuzumi); }
+  .hazard .label { color: var(--shu); }
+  .check .label::before { content: "確認のお願い"; }
+  .hazard .label::before { content: "停止のお知らせ"; }
+  .check .seal { position: absolute; left: 12px; bottom: 12px; width: 58px; height: 58px; border-radius: 50%; border: 3px solid var(--shu);
+    color: var(--shu); display: grid; place-items: center; font-weight: 700; font-size: .78rem; rotate: -12deg; }
+  .check .seal::before { content: "要確認"; }
+  .card-id { font-family: var(--gothic); font-size: .78rem; color: var(--usuzumi); margin: 0 10px; }
+  .card-title { font-size: 1.25rem; font-weight: 700; line-height: 1.6; margin: 0 4px; letter-spacing: .05em; }
+  .reason { font-size: .95rem; line-height: 1.8; margin: 0 8px; }
+
+  /* 次にやる順 */
+  .queue li { grid-template-columns: 56px 1fr auto; padding: 0 10px; }
+  .queue li + li { border-right: 1px dotted var(--usuzumi); }
+  .queue .num { font-size: 1.8rem; text-align: center; text-orientation: upright; }
+  .queue .plate .t { display: block; font-weight: 700; font-size: 1.05rem; letter-spacing: .05em; }
+  .queue .plate .m { font-family: var(--gothic); font-size: .72rem; color: var(--usuzumi); }
+  .queue li.first .num { color: var(--shu); }
+  .queue li.first .t::before { content: "次"; color: #fff; background: var(--shu); padding: 3px 1px; margin-bottom: 8px; font-size: .8rem; display: inline-block; }
+  .burst:not(:empty) { font-family: var(--gothic); font-size: .7rem; color: #fff; background: var(--shu); padding: 4px 1px; }
+  .queue li.low { color: var(--usuzumi); }
+  .queue li:hover { background: rgba(181, 52, 31, .05); }
+
+  /* 終わったもの: 済の判子 */
+  .cleared { gap: 16px 0; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .tile { padding: 12px 10px 60px; }
+  .tile + .tile { border-right: 1px solid #cfc8b8; }
+  .tile .card-id { margin: 0; font-size: .72rem; }
+  .tile .tt { font-size: .95rem; line-height: 1.6; margin: 0 4px; }
+  .tile time { font-family: var(--gothic); font-size: .72rem; color: var(--usuzumi); }
+  .tile .seal { position: absolute; left: 4px; bottom: 8px; width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--shu);
+    color: var(--shu); display: grid; place-items: center; font-weight: 700; rotate: -10deg; }
+  .tile.done .seal::before { content: "済"; font-size: 1.15rem; }
+  .tile.cancelled .seal { border-color: var(--usuzumi); color: var(--usuzumi); font-size: .68rem; }
+  .tile.cancelled .seal::before { content: "中止"; }
+  .tile.cancelled .tt { text-decoration: line-through; color: var(--usuzumi); }
+
+  /* 決定記録 */
+  .files { gap: 20px 0; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .file { border-right: 3px solid var(--sumi); padding: 12px 12px; margin-left: 16px; }
+  .file .no { font-family: var(--gothic); font-size: .75rem; color: var(--usuzumi); }
+  .file .ft { font-size: 1.1rem; font-weight: 700; line-height: 1.6; margin: 0 8px; letter-spacing: .04em; }
+  .file .fm { display: flex; justify-content: space-between; font-family: var(--gothic); font-size: .72rem; color: var(--usuzumi); }
+  .file .chip.solid { color: var(--shu); }
+
+  /* 流れるコミット: ここだけ横書き */
+  .ticker { background: var(--washi); border-top: 3px double var(--sumi); color: var(--sumi); }
+  .ticker .tag { background: var(--shu); color: #fff; font-size: 0; }
+  .ticker .tag::before { content: "記録"; font-size: 1rem; font-weight: 700; letter-spacing: .3em; }
+  .ticker .track span { font-size: .88rem; }
+  .ticker .track span b { font-family: var(--gothic); color: var(--usuzumi); margin-right: 10px; font-size: .78rem; }
+  .ticker .track span::after { content: "〆"; color: var(--shu); padding-left: 30px; }
+
+  .rise { animation: ink-in .9s ease both; animation-delay: calc(var(--d, 0) * 60ms); }
+
+  /* 終わったときの演出: 掛け軸が上から開く */
+  .cutin { background: rgba(31, 29, 26, .35); }
+  .cutin .band { writing-mode: vertical-rl; position: absolute; left: 50%; top: 50%; translate: -50% -50%; height: 72vh; padding: 40px 44px;
+    display: flex; gap: 28px; align-items: flex-start; background: var(--washi);
+    border-top: 16px solid #3b2a1a; border-bottom: 16px solid #3b2a1a; box-shadow: 0 30px 70px rgba(0, 0, 0, .4);
+    animation: unroll 2.6s cubic-bezier(.3, .8, .3, 1) both; }
+  .cutin .word { font-size: 4.2rem; font-weight: 800; letter-spacing: .25em; }
+  .cutin .word::before { content: "見事\A完了"; white-space: pre; }
+  .cutin .what { font-size: 1.5rem; font-weight: 700; line-height: 1.6; letter-spacing: .05em; }
+  .cutin .what b { display: block; font-family: var(--gothic); font-size: .85rem; font-weight: 400; color: var(--usuzumi); }
+  .cutin .band::after { content: "完"; position: absolute; left: 30px; bottom: 34px; width: 72px; height: 72px; display: grid; place-items: center;
+    background: var(--shu); color: #fff; font-size: 2.2rem; font-weight: 800; border-radius: 6px; rotate: -8deg; writing-mode: horizontal-tb; }
+}

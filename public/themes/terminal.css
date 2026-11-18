@@ -1,0 +1,154 @@
+/* テーマ: 管制室。黒い画面に琥珀色の字の端末 */
+:root[data-theme="terminal"] {
+  --bg: #0e0b06; --amber: #ffb43a; --dim: #c19447; --hi: #fff0d2; --alert: #ff7255; --line: #5a4420;
+  --mono: "SF Mono", ui-monospace, Menlo, "Hiragino Sans", monospace;
+  font-family: var(--mono); color: var(--amber); background: var(--bg);
+  text-shadow: 0 0 6px rgba(255, 180, 58, .22);
+
+  /* 背景: 走査線 */
+  .bg { background: radial-gradient(ellipse at center, #1b150a 0%, var(--bg) 75%); }
+  .bg i { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .35) 0 1px, transparent 1px 3px); }
+
+  /* ヘッダー: プロンプト */
+  .top { padding: 18px 48px; border-bottom: 1px solid var(--line); }
+  .logo { font-size: 1.6rem; font-weight: 700; color: var(--hi); letter-spacing: .3em; }
+  .logo::before { content: "$ "; color: var(--dim); letter-spacing: 0; }
+  .logo::after { content: "_"; animation: blink 1s steps(2) infinite; }
+  .branch { color: var(--dim); font-size: .9rem; }
+  .branch::before { content: "branch="; }
+  .branch em { font-style: normal; margin-left: 12px; color: var(--bg); background: var(--amber); padding: 1px 8px; text-shadow: none; }
+  .live { font-size: .9rem; color: var(--alert); letter-spacing: .2em; }
+  .live::before { content: "● "; animation: blink 1.2s steps(2) infinite; }
+  .clock { font-size: 2.4rem; font-weight: 700; color: var(--hi); }
+  .clock small { font-size: .9rem; color: var(--dim); margin-left: 10px; }
+
+  /* 数の帯: 区切った箱 */
+  .stats { padding: 22px 48px 0; }
+  .stat { border: 1px solid var(--line); padding: 10px 22px; display: flex; align-items: baseline; gap: 12px; margin-right: -1px; }
+  .stat b { font-size: 2.6rem; color: var(--hi); }
+  .stat span { color: var(--dim); font-size: .85rem; }
+  .stat.hot { background: var(--amber); }
+  .stat.hot b, .stat.hot span { color: var(--bg); text-shadow: none; }
+  .stat.warn b { color: var(--alert); }
+
+  main { gap: 48px; }
+
+  /* 見出し: ## NOW // 進行中 */
+  .h { display: flex; align-items: baseline; gap: 14px; margin: 0 0 18px; font-weight: 400; border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+  .h b { font-size: 1.5rem; color: var(--hi); }
+  .h b::before { content: "## "; color: var(--dim); }
+  .h small { font-size: .9rem; color: var(--dim); }
+  .h small::before { content: "// "; }
+  .h .n { color: var(--hi); }
+
+  /* 進行中 */
+  .now-list { gap: 26px; }
+  .op .face { border: 1px solid var(--amber); padding: 20px 22px; position: relative; }
+  .op .face::before { content: "RUNNING"; position: absolute; top: -10px; right: 16px; background: var(--bg); padding: 0 8px;
+    font-size: .8rem; animation: blink 1.6s steps(2) infinite; }
+  .op .bigid { display: none; }
+  .op .stamp { background: var(--amber); color: var(--bg); padding: 1px 8px; margin-right: 8px; font-weight: 700; text-shadow: none; }
+  .op h3 { font-size: 1.5rem; color: var(--hi); margin: 14px 0 12px; line-height: 1.45; }
+  .op .crumb { display: block; font-size: .85rem; color: var(--dim); font-weight: 400; }
+  .op .crumb::before { content: "../"; }
+  .bubble { border-left: 2px solid var(--amber); padding: 8px 14px; background: rgba(255, 180, 58, .07); line-height: 1.6; }
+  .bubble::before { content: "> "; color: var(--dim); }
+  .op .foot { display: flex; gap: 14px; margin-top: 12px; font-size: .85rem; color: var(--dim); }
+  .op .foot .br::before { content: "git:"; }
+  .op .foot time { margin-left: auto; color: var(--hi); }
+  .chip { font-size: .8rem; color: var(--dim); }
+  .chip::before { content: "["; }
+  .chip::after { content: "]"; }
+  .chip.solid { color: var(--alert); }
+  .kids i { width: 10px; height: 14px; border: 1px solid var(--amber); }
+  .kids i.on { background: var(--amber); }
+
+  /* マイルストーン */
+  .ms { border: 1px solid var(--line); padding: 14px 16px; margin-top: -1px; position: relative; }
+  .ms.active { border-color: var(--amber); z-index: 1; }
+  .ms.done { color: var(--dim); }
+  .ms .row1 { display: flex; align-items: baseline; gap: 10px; }
+  .ms .mid { color: var(--hi); font-weight: 700; }
+  .ms.done .mid { color: var(--dim); }
+  .ms .title { font-weight: 700; }
+  .ms .state { font-size: .75rem; }
+  .ms .state::before { content: "["; }
+  .ms .state::after { content: "]"; }
+  .ms .pct { margin-left: auto; font-size: 1.8rem; color: var(--hi); }
+  .ms.done .pct { color: var(--dim); }
+  .ms .goal { font-size: .82rem; color: var(--dim); margin: 4px 0 10px; }
+  .segs { gap: 3px; }
+  .segs i { flex: 1; height: 12px; border: 1px solid var(--line); }
+  .segs i.done { background: var(--amber); border-color: var(--amber); }
+  .segs i.doing { border-color: var(--amber); background: rgba(255, 180, 58, .4); animation: blink 1s steps(2) infinite; }
+  .ms.done .segs i.done { background: var(--dim); border-color: var(--dim); }
+
+  /* 確認待ち・止まっている */
+  .check { border: 1px solid var(--amber); padding: 16px 18px; }
+  .hazard { border: 2px solid var(--alert); padding: 16px 18px; }
+  .check .label, .hazard .label { font-size: .95rem; font-weight: 700; color: var(--hi); }
+  .hazard .label { color: var(--alert); }
+  .check .label::before { content: "[ REVIEW ]"; }
+  .hazard .label::before { content: "[ BLOCKED ]"; }
+  .check .seal { position: absolute; top: 18px; right: 16px; font-size: .78rem; animation: blink 1.4s steps(2) infinite; }
+  .check .seal::before { content: "AWAITING ACK"; }
+  .card-id { color: var(--dim); font-size: .9rem; margin-top: 10px; }
+  .card-title { color: var(--hi); font-weight: 700; font-size: 1.15rem; line-height: 1.5; margin: 4px 0 10px; }
+  .reason { font-size: .9rem; margin-bottom: 10px; line-height: 1.6; }
+  .reason::before { content: "> "; color: var(--dim); }
+  .hazard .reason { color: var(--alert); }
+
+  /* 次にやる順 */
+  .queue li { grid-template-columns: 56px 1fr auto; border-bottom: 1px dashed var(--line); padding: 10px 8px 10px 0; }
+  .queue .num { color: var(--dim); }
+  .queue .num::before { content: "#"; }
+  .queue .plate .t { display: block; color: var(--hi); font-weight: 700; }
+  .queue .plate .m { font-size: .8rem; color: var(--dim); }
+  .queue li.first { background: var(--amber); padding-left: 8px; text-shadow: none; }
+  .queue li.first * { color: var(--bg) !important; }
+  .queue li.first .t::after { content: "  <- NEXT"; }
+  .burst { color: var(--alert); font-size: .8rem; }
+  .burst:not(:empty)::before { content: "!! "; }
+  .queue li.low { opacity: .6; }
+  .queue li:hover { background: rgba(255, 180, 58, .08); }
+
+  /* 終わったもの: ログの行 */
+  .cleared { gap: 0 32px; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+  .tile { display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px; align-items: baseline; padding: 8px 4px;
+    border-bottom: 1px dashed var(--line); color: var(--dim); }
+  .tile .card-id { margin: 0; font-size: .82rem; }
+  .tile .tt { font-size: .92rem; color: var(--amber); }
+  .tile time { font-size: .78rem; }
+  .tile .seal { font-size: .82rem; font-weight: 700; }
+  .tile.done .seal::before { content: "[  OK  ]"; color: var(--amber); }
+  .tile.cancelled .seal::before { content: "[ABORT]"; }
+  .tile.cancelled .tt { text-decoration: line-through; color: var(--dim); }
+
+  /* 決定記録 */
+  .files { gap: 14px; }
+  .file { border: 1px solid var(--line); padding: 14px 16px; }
+  .file .no { color: var(--hi); font-size: .85rem; }
+  .file .ft { color: var(--hi); margin: 8px 0; line-height: 1.5; }
+  .file .fm { display: flex; justify-content: space-between; font-size: .8rem; color: var(--dim); }
+  .file:hover, .check:hover, .op:hover .face { background: rgba(255, 180, 58, .06); }
+
+  /* コミット */
+  .ticker { background: var(--bg); border-top: 1px solid var(--amber); }
+  .ticker .tag { background: var(--amber); color: var(--bg); text-shadow: none; font-weight: 700; }
+  .ticker .track span { font-size: .85rem; color: var(--dim); }
+  .ticker .track span b { color: var(--hi); margin-right: 10px; }
+  .ticker .track span::after { content: "·"; padding-left: 40px; }
+
+  .rise { animation: flicker .5s steps(4) both; animation-delay: calc(var(--d, 0) * 90ms); }
+
+  /* 終わったときの演出: 端末の通知 */
+  .cutin { background: rgba(8, 6, 3, .85); }
+  .cutin.show { animation: term-cut 2.4s steps(1) both; }
+  .cutin .band { position: absolute; left: 50%; top: 50%; translate: -50% -50%; border: 2px solid var(--amber); background: var(--bg);
+    padding: 28px 40px; min-width: 560px; }
+  .cutin .word { display: block; font-size: 2.6rem; font-weight: 700; color: var(--hi); }
+  .cutin .word::before { content: "TASK COMPLETE"; }
+  .cutin .word::after { content: "_"; animation: blink .6s steps(2) infinite; }
+  .cutin .what { display: block; margin-top: 14px; font-size: 1.1rem; }
+  .cutin .what b { display: block; color: var(--dim); font-size: .9rem; font-weight: 400; }
+}

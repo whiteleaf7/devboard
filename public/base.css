@@ -1,4 +1,4 @@
-/* ボードと活動の画面が共有する土台: 色・文字・ヘッダー・ボタン */
+/* 活動の画面の土台: 色・文字・ヘッダー・ボタン。ボードの画面は board.css とテーマ（themes/）を使う。暗い面は theme.js が付ける data-scheme で切り替える */
 :root {
   color-scheme: light;
   --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --sub: #6b6862; --line: #e3e0da;
@@ -14,7 +14,7 @@
 :root[data-font-size="small"] { font-size: 14px; }
 :root[data-font-size="large"] { font-size: 16px; }
 :root[data-font-size="xlarge"] { font-size: 18px; }
-:root[data-theme="dark"] {
+:root[data-scheme="dark"] {
   color-scheme: dark;
   --bg: #1b1a18; --panel: #252422; --ink: #ecebe8; --sub: #9c9890; --line: #3a3835;
   --error-bg: #3a2220; --error-ink: #f0b4ad;

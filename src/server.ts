@@ -2,6 +2,7 @@
 //   GET /               ボードの画面（public/index.html）
 //   GET /activity       活動の画面（public/activity.html）
 //   GET /base.css, /theme.js, /markdown.js, /paging.js  画面が共有するスタイル・テーマ・Markdown の解析器・一覧の省略（public/）
+//   GET /board.css, /themes/<id>.css  ボードの画面の土台とテーマ（public/themes/）
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と決定記録のディレクトリと .git の変更で送る
@@ -11,7 +12,7 @@
 // 許可する名前は起動時に `tailscale status` から取る。DEVBOARD_HOSTS（カンマ区切り）で足せる。
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
+import { readdirSync, readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { loadActivity } from "./activity-sources.ts";
@@ -27,6 +28,9 @@ export function instanceFile(): string {
 }
 
 const asset = (name: string) => readFileSync(join(import.meta.dirname, "..", "public", name));
+
+// 返してよいテーマの CSS。名前は public/themes/ にあるものだけにし、パスを組み立てて外へ出られないようにする
+const THEME_FILES = new Set(readdirSync(join(import.meta.dirname, "..", "public", "themes")).filter((f) => /^[a-z-]+\.css$/.test(f)));
 
 const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
@@ -115,7 +119,8 @@ export function startServer(
       case "/activity":
         return send(res, 200, "text/html; charset=utf-8", asset("activity.html"));
       case "/base.css":
-        return send(res, 200, "text/css; charset=utf-8", asset("base.css"));
+      case "/board.css":
+        return send(res, 200, "text/css; charset=utf-8", asset(url.pathname.slice(1)));
       case "/theme.js":
       case "/markdown.js":
       case "/paging.js":
@@ -136,8 +141,11 @@ export function startServer(
         clients.add(res);
         req.on("close", () => clients.delete(res));
         return;
-      default:
+      default: {
+        const theme = url.pathname.match(/^\/themes\/([a-z-]+\.css)$/)?.[1];
+        if (theme && THEME_FILES.has(theme)) return send(res, 200, "text/css; charset=utf-8", asset(`themes/${theme}`));
         return send(res, 404, "text/plain", "not found");
+      }
     }
   });
 
