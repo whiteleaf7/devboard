@@ -9,33 +9,53 @@
 <title>devboard</title>
 <link rel="stylesheet" href="/base.css">
 <style>
-  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .section-head h2 { margin: 0; }
-  .section-head button.secondary { font-size: 12px; padding: 2px 8px; color: var(--sub); }
-  .milestones { display: flex; gap: var(--gap); flex-wrap: wrap; }
-  .ms { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; min-width: 200px; max-width: 320px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
-  .ms[aria-pressed="true"] { outline: 2px solid var(--doing); outline-offset: -1px; }
-  .ms .head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
-  .ms .goal { color: var(--sub); font-size: 12px; margin-top: 4px; }
-  .ms .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .task-head { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .task-head h2 { margin: 0; flex: none; }
+  .milestones { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .ms { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font: inherit; font-size: 12px; color: inherit; cursor: pointer; white-space: nowrap; }
+  .ms::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); flex: none; }
+  .ms .name { max-width: 16em; overflow: hidden; text-overflow: ellipsis; }
+  .ms .bar { width: 32px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; flex: none; }
   .ms .bar i { display: block; height: 100%; background: var(--done); }
-  .tag.active { color: var(--doing); border-color: var(--doing); }
-  .tag.done { color: var(--done); border-color: var(--done); }
+  .ms .count { color: var(--sub); font-variant-numeric: tabular-nums; }
+  .ms[aria-pressed="true"] { border-color: var(--doing); box-shadow: inset 0 0 0 1px var(--doing); }
+  .ms.more { color: var(--sub); }
+  .ms.more::before { display: none; }
 
-  .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
-  .card .title { overflow-wrap: anywhere; }
-  .col h3 { font-size: 12px; margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
-  .col h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
-  .col h3 .n { color: var(--sub); font-weight: normal; }
-  .cards { display: grid; gap: 8px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: var(--radius); padding: 8px 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
-  .card .id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--sub); }
-  .card .title { margin: 2px 0 4px; }
-  .card .meta { display: flex; gap: 4px; flex-wrap: wrap; }
-  .card.cancelled { opacity: 0.55; }
-  .card.cancelled .title { text-decoration: line-through; }
+  .groups { display: grid; gap: 10px; }
+  .group { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .group > summary { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; list-style: none; user-select: none; }
+  .group > summary::-webkit-details-marker { display: none; }
+  .group > summary::before { content: "▶"; color: var(--sub); font-size: 9px; width: 10px; text-align: center; transition: transform 0.15s; }
+  .group[open] > summary::before { transform: rotate(90deg); }
+  .group > summary .sq { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+  .group > summary .n { color: var(--sub); font-weight: normal; }
+  /* 空のグループは枠を付けず、見出しの 1 行だけにして場所を取らない */
+  .group.empty { background: none; border-color: transparent; }
+  .group.empty > summary { color: var(--sub); cursor: default; padding-block: 0; }
+  .group.empty > summary::before { visibility: hidden; }
+  .group .pager { margin: 0; padding: 6px 12px 8px; border-top: 1px solid var(--line); }
+
+  .row { display: grid; grid-template-columns: 18px 5.4em minmax(10em, 1fr) auto 4.6em; grid-template-areas: "mark id title tags ago" ". . note note note"; align-items: baseline; gap: 2px 10px; padding: 7px 12px; border-top: 1px solid var(--line); cursor: pointer; transition: opacity 0.12s; }
+  .row:hover { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+  .row:focus-visible { outline: 2px solid var(--doing); outline-offset: -2px; }
+  .row .mark { grid-area: mark; justify-self: center; font-family: ui-monospace, monospace; font-size: 11px; color: var(--sub); }
+  .row .mark.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); align-self: center; }
+  .row .meta { display: contents; }
+  .row .id { grid-area: id; font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); }
+  .row .title { grid-area: title; overflow-wrap: anywhere; line-height: 1.5; }
+  .row .crumb { display: inline-block; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: var(--sub); font-size: 12px; margin-right: 4px; }
+  .row .tags { grid-area: tags; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 26em; min-width: 0; }
+  .row .ago { grid-area: ago; text-align: right; color: var(--sub); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .row .note-line { grid-area: note; color: var(--sub); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .row.cancelled { opacity: 0.55; }
+  .row.cancelled .title { text-decoration: line-through; }
+  .groups.focusing .row:not(.self, .related) { opacity: 0.35; }
+  .groups.focusing .row.related { background: color-mix(in srgb, var(--doing) 8%, transparent); }
   .tag.high { color: var(--blocked); border-color: var(--blocked); }
   .tag.wait { color: var(--review); border-color: var(--review); }
+  .tag.blocking { color: var(--doing); border-color: var(--doing); }
+  .tag.closable { color: var(--done); border-color: var(--done); }
 
   .decisions { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
   .decisions button { display: flex; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -92,31 +112,26 @@
 
   .note .by { font-size: 11px; margin-left: 6px; }
 
-  .status-tabs { display: none; }
-
   #settings { width: min(360px, 92vw); }
   #settings fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 12px; margin: 0; display: grid; gap: 8px; }
   #settings legend { font-size: 12px; color: var(--sub); padding: 0 4px; }
   #settings label { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
   .settings-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 
-  /* スマホ: 1 列ずつタブで切り替え、ダイアログは画面いっぱいにする */
+  /* スマホ: 行は「タイトル」「ID・タグ・時刻」「最新メモ」の段に分け、ダイアログは画面いっぱいにする */
   @media (max-width: 760px) {
-    .milestones { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+    .task-head { flex-wrap: nowrap; }
+    .milestones { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding: 2px 16px 2px 0; scrollbar-width: none; }
     .milestones::-webkit-scrollbar { display: none; }
-    .ms { flex: 0 0 78%; max-width: none; scroll-snap-align: start; }
 
-    .status-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
-    .status-tabs button { font: inherit; font-size: 11px; line-height: 1.3; color: var(--sub); background: var(--panel); border: 1px solid var(--line); border-bottom: 3px solid var(--line); border-radius: var(--radius); padding: 6px 2px 4px; min-height: 48px; display: grid; justify-items: center; align-content: center; gap: 2px; white-space: nowrap; }
-    .status-tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--line); border-bottom-color: var(--c); font-weight: 600; }
-    .status-tabs .n { font-size: 15px; font-weight: 600; color: var(--ink); }
-
-    .board { grid-template-columns: minmax(0, 1fr); }
-    .col { display: none; }
-    .col.current { display: block; }
-    .col h3 { display: none; }
-    .card { padding: 10px 12px; }
-    .card .title { font-size: 15px; }
+    .row { grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-areas: "mark title title" ". meta ago" ". note note"; padding: 9px 12px; gap: 3px 8px; }
+    .row .title { font-size: 15px; }
+    .row .meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; min-width: 0; }
+    .row .tags { display: contents; }
+    /* ブランチ名は長く、スマホでは詳細で見れば足りる */
+    .row .tag.branch { display: none; }
+    .row .mark { align-self: start; margin-top: 5px; }
+    .row .mark.dot { align-self: start; margin-top: 7px; }
 
     .decisions button { flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; }
     .decisions .title { flex-basis: calc(100% - 60px); }
@@ -142,16 +157,11 @@
 <main>
   <div class="errors" id="errors"></div>
   <section>
-    <div class="section-head">
-      <h2>マイルストーン</h2>
-      <button type="button" class="secondary" id="toggle-done-milestones" aria-pressed="false" hidden></button>
+    <div class="task-head">
+      <h2>タスク</h2>
+      <div class="milestones" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
     </div>
-    <div class="milestones" id="milestones"></div>
-  </section>
-  <section>
-    <h2 id="board-title">タスク</h2>
-    <div class="status-tabs" id="status-tabs" role="tablist" aria-label="表示する状態"></div>
-    <div class="board" id="board"></div>
+    <div class="groups" id="board"></div>
   </section>
   <section>
     <h2>決定記録</h2>
@@ -204,11 +214,15 @@
 import { parseMarkdown } from "./markdown.js";
 import { nextLimit, page } from "./paging.js";
 
-const COLUMNS = [
-  ["todo", "未着手"], ["doing", "作業中"], ["review", "確認待ち"], ["blocked", "ブロック"], ["done", "完了・中止"],
+// 上から、眺めたい順・手を出す順に並べる
+const GROUPS = [
+  ["doing", "作業中"], ["review", "確認待ち"], ["blocked", "ブロック"], ["todo", "未着手"], ["done", "完了・中止"],
 ];
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
-const LIST_SIZE = { column: { first: 8, step: 20 }, decisions: { first: 5, step: 20 } };
+const LIST_SIZE = { group: { first: 10, step: 30 }, decisions: { first: 5, step: 20 } };
+const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+// 最新メモを 2 行目に出す状態。動いているか、あなたの手を待っているもの
+const SHOW_NOTE = ["doing", "review", "blocked"];
 document.getElementById("open-settings").onclick = () => {
   for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
   document.getElementById("settings").showModal();
@@ -221,8 +235,11 @@ let data = null;
 let filter = null; // 選択中のマイルストーン ID
 const SHOW_DONE_MILESTONES_KEY = "devboard-show-done-milestones";
 let showDoneMilestones = localStorage.getItem(SHOW_DONE_MILESTONES_KEY) === "true";
-let mobileStatus = "todo"; // スマホで表示している列
-const limits = new Map(); // 一覧（列の状態か "decisions"）ごとに開いた件数。変更の通知で描き直しても保つ
+const OPEN_GROUPS_KEY = "devboard-open-groups";
+// グループごとの開閉。覚えていないものは、完了・中止だけたたむ
+const openGroups = (() => { try { return JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) ?? "{}"); } catch { return {}; } })();
+const isOpen = (status) => openGroups[status] ?? status !== "done";
+const limits = new Map(); // 一覧（グループの状態か "decisions"）ごとに開いた件数。変更の通知で描き直しても保つ
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
@@ -231,6 +248,35 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 const fmt = (iso) => new Date(iso).toLocaleString("ja-JP", { dateStyle: "short", timeStyle: "short" });
+const ago = (iso) => {
+  const d = new Date(iso);
+  const sec = (Date.now() - d.getTime()) / 1000;
+  if (sec < 60) return "たった今";
+  if (sec < 3600) return `${Math.floor(sec / 60)}分前`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}時間前`;
+  if (sec < 86400 * 7) return `${Math.floor(sec / 86400)}日前`;
+  return d.toLocaleDateString("ja-JP", d.getFullYear() === new Date().getFullYear() ? { month: "numeric", day: "numeric" } : { dateStyle: "short" });
+};
+// 経過時間の表示は、描き直しを待たずに進める
+setInterval(() => { for (const t of document.querySelectorAll("time.ago[data-at]")) t.textContent = ago(t.dataset.at); }, 30_000);
+
+// 一覧の 2 行目に入れるため、Markdown を記号のない 1 行の文にする
+const inlineText = (items) => items.map((n) => (n.type === "text" || n.type === "code" ? n.text : inlineText(n.children))).join("");
+const blockText = (b) => {
+  switch (b.type) {
+    case "heading": return inlineText(b.content);
+    case "paragraph": return b.lines.map(inlineText).join(" ");
+    case "list": return b.items.map((item) => item.map(blockText).join(" ")).join(" / ");
+    case "quote": return b.children.map(blockText).join(" ");
+    case "code": return b.text;
+    default: return "";
+  }
+};
+const plainText = (md) => parseMarkdown(md).map(blockText).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+
+const FINISHED = ["done", "cancelled"];
+// このタスクを依存先に挙げているタスク（終わったものも含む）
+const dependentsOf = (id) => data.tasks.filter((t) => t.dependsOn.includes(id));
 
 const inlineNodes = (items) => items.map((n) => {
   switch (n.type) {
@@ -294,6 +340,7 @@ function renderTaskView(task) {
     ["マイルストーン", task.milestone && [milestone ? `${milestone.id} ${milestone.title}` : task.milestone]],
     ["親タスク", task.parent && [taskLink(task.parent)]],
     ["依存", task.dependsOn.length && task.dependsOn.map(taskLink), "stack"],
+    ["待っているタスク", dependentsOf(task.id).map((t) => taskLink(t.id)), "stack"],
     ["子タスク", task.children.length && task.children.map(taskLink), "stack"],
     ["ラベル", task.labels.length && task.labels.map((l) => el("span", { className: "tag", textContent: l }))],
     ["ブランチ", task.branch && [el("code", { textContent: task.branch })]],
@@ -301,7 +348,7 @@ function renderTaskView(task) {
     ["登録", [`${task.createdBy === "user" ? "あなた" : "AI"} · ${fmt(task.created)}`]],
     ["更新", [fmt(task.updated)]],
   ];
-  $("view-props").replaceChildren(...props.filter(([, value]) => value).flatMap(([label, value, className = ""]) =>
+  $("view-props").replaceChildren(...props.filter(([, value]) => value && value.length !== 0).flatMap(([label, value, className = ""]) =>
     [el("dt", { textContent: label }), el("dd", { className }, ...value)]));
   $("view-description").replaceChildren(...(task.description.trim()
     ? markdownNodes(task.description)
@@ -359,73 +406,129 @@ function render() {
   $("errors").textContent = errors.join("\n");
 
   const doneMilestones = project.milestones.filter((m) => m.status === "done").length;
-  const toggle = $("toggle-done-milestones");
-  toggle.hidden = doneMilestones === 0;
-  toggle.textContent = showDoneMilestones ? "完了を隠す" : `完了を表示（${doneMilestones}）`;
-  toggle.setAttribute("aria-pressed", String(showDoneMilestones));
-  toggle.onclick = () => {
+  const listed = project.milestones.filter((m) => showDoneMilestones || m.status !== "done");
+  const toggleDone = el("button", { type: "button", className: "ms more",
+    textContent: showDoneMilestones ? "完了を隠す" : `完了 ${doneMilestones}`, title: showDoneMilestones ? "" : `完了したマイルストーン ${doneMilestones} 件も出す` });
+  toggleDone.setAttribute("aria-pressed", String(showDoneMilestones));
+  toggleDone.onclick = () => {
     showDoneMilestones = !showDoneMilestones;
     localStorage.setItem(SHOW_DONE_MILESTONES_KEY, String(showDoneMilestones));
     if (!showDoneMilestones && project.milestones.find((m) => m.id === filter)?.status === "done") filter = null;
     render();
   };
-  const listed = project.milestones.filter((m) => showDoneMilestones || m.status !== "done");
   $("milestones").replaceChildren(...listed.map((m) => {
-    const mine = tasks.filter((t) => t.milestone === m.id);
+    // 中止したタスクは、進み具合の分母に入れない
+    const mine = tasks.filter((t) => t.milestone === m.id && t.status !== "cancelled");
     const done = mine.filter((t) => t.status === "done").length;
     const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
     const label = { planned: "予定", active: "進行中", done: "完了" }[m.status];
-    const node = el("button", { className: "ms", type: "button" },
-      el("div", { className: "head" }, `${m.id} ${m.title}`, el("span", { className: `tag ${m.status}`, textContent: label })),
-      el("div", { className: "goal", textContent: m.goal }),
-      el("div", { className: "bar", title: `${done}/${mine.length}` }, el("i", { style: `width:${pct}%` })),
+    const node = el("button", { className: "ms", type: "button", style: `--c: var(--${{ planned: "todo", active: "doing", done: "done" }[m.status]})`,
+      title: `${m.id} ${m.title}（${label}）${m.goal ? `\n${m.goal}` : ""}` },
+      el("span", { className: "name", textContent: `${m.id} ${m.title}` }),
+      el("span", { className: "bar" }, el("i", { style: `width:${pct}%` })),
+      el("span", { className: "count", textContent: `${done}/${mine.length}` }),
     );
     node.setAttribute("aria-pressed", String(filter === m.id));
     node.onclick = () => { filter = filter === m.id ? null : m.id; render(); };
     return node;
-  }));
+  }), ...(doneMilestones ? [toggleDone] : []));
+
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const isFinished = (id) => FINISHED.includes(byId.get(id)?.status);
+  // 終わっていない依存先として自分を待っている、終わっていないタスク
+  const waiters = new Map();
+  for (const t of tasks) {
+    if (FINISHED.includes(t.status)) continue;
+    for (const w of t.waitingOn) waiters.set(w.id, [...(waiters.get(w.id) ?? []), t.id]);
+  }
+  // 行に乗せたときに浮かせる、つながりのあるタスク
+  const relatedOf = (t) => new Set([t.parent, ...t.children, ...t.dependsOn, ...dependentsOf(t.id).map((d) => d.id)].filter(Boolean));
+
+  const board = $("board");
+  const clearFocus = () => {
+    board.classList.remove("focusing");
+    for (const r of board.querySelectorAll(".row.self, .row.related")) r.classList.remove("self", "related");
+  };
+  const focusRelated = (t) => {
+    clearFocus();
+    const related = relatedOf(t);
+    const rows = [...board.querySelectorAll(".row")].filter((r) => related.has(r.dataset.id));
+    if (!rows.length) return;
+    board.classList.add("focusing");
+    board.querySelector(`.row[data-id="${t.id}"]`)?.classList.add("self");
+    for (const r of rows) r.classList.add("related");
+  };
+
+  const tag = (text, className = "", title = "") => el("span", { className: `tag ${className}`.trim(), textContent: text, title });
+  const tagsOf = (t) => {
+    const done = t.children.filter(isFinished).length;
+    const blocking = waiters.get(t.id) ?? [];
+    return [
+      ...(t.status === "cancelled" ? [tag("中止")] : []),
+      ...(t.priority === "high" ? [tag("優先", "high")] : []),
+      ...(t.children.length ? [t.closable
+        ? tag(`子 ${done}/${t.children.length} · 閉じられる`, "closable", "子タスクがすべて終わっている")
+        : tag(`子 ${done}/${t.children.length}`)] : []),
+      ...(t.waitingOn.length ? [tag(`待ち ${t.waitingOn.map((w) => w.id).join(", ")}`, "wait")] : []),
+      ...(t.stuck ? [tag("進められない", "wait", t.stuck)] : []),
+      ...(blocking.length ? [tag(blocking.length === 1 ? `止めている ${blocking[0]}` : `止めている ${blocking.length} 件`, "blocking", blocking.join(", "))] : []),
+      ...(t.milestone && !filter ? [tag(t.milestone)] : []),
+      ...t.labels.map((l) => tag(l)),
+      ...(t.branch ? [tag(t.branch, "branch", t.branch)] : []),
+    ];
+  };
+
+  const rowOf = (t) => {
+    const parent = t.parent && byId.get(t.parent);
+    const lastNote = SHOW_NOTE.includes(t.status) ? t.notes.at(-1) : null;
+    const noteText = lastNote ? plainText(lastNote.text) : "";
+    const row = el("div", { className: `row ${t.status}`, tabIndex: 0, role: "button", style: statusColor(t.status) },
+      t.status === "todo" && t.order != null
+        ? el("span", { className: "mark", textContent: String(t.order), title: "着手する順" })
+        : el("span", { className: "mark dot" }),
+      el("span", { className: "meta" },
+        el("span", { className: "id", textContent: t.id }),
+        el("span", { className: "tags" }, ...tagsOf(t))),
+      el("span", { className: "title" },
+        ...(t.parent ? [el("span", { className: "crumb", textContent: `${parent ? parent.title : t.parent} ›`, title: `親タスク ${t.parent}` })] : []),
+        t.title),
+      el("time", { className: "ago", dateTime: t.updated, textContent: ago(t.updated), title: `更新 ${fmt(t.updated)}` }),
+      ...(noteText ? [el("div", { className: "note-line", textContent: noteText, title: noteText })] : []),
+    );
+    row.querySelector("time").dataset.at = t.updated;
+    row.dataset.id = t.id;
+    row.onclick = () => showTask(t.id);
+    row.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showTask(t.id); } };
+    row.onmouseenter = () => focusRelated(t);
+    row.onmouseleave = clearFocus;
+    return row;
+  };
 
   const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
-  $("board-title").textContent = filter ? `タスク（${filter} のみ）` : "タスク";
-  const inColumnOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
-  $("status-tabs").replaceChildren(...COLUMNS.map(([status, label]) => {
-    const tab = el("button", { type: "button", role: "tab", style: `--c: var(--${status})` },
-      label, el("span", { className: "n", textContent: shown.filter(inColumnOf(status)).length }));
-    tab.setAttribute("aria-selected", String(status === mobileStatus));
-    tab.onclick = () => { mobileStatus = status; render(); };
-    return tab;
-  }));
-  $("board").replaceChildren(...COLUMNS.map(([status, label]) => {
-    const inColumn = inColumnOf(status);
-    // 未着手は着手する順（order）。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く
-    const items = shown.filter(inColumn).sort((a, b) =>
-      status === "todo"
-        ? (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id)
-        : b.updated.localeCompare(a.updated));
-    const paged = pagedList(status, LIST_SIZE.column, items);
-    return el("div", { className: `col${status === mobileStatus ? " current" : ""}`, style: `--c: var(--${status})` },
-      el("h3", {}, label, el("span", { className: "n", textContent: items.length })),
-      el("div", { className: "cards" }, ...(items.length ? paged.shown.map((t) => {
-        const card = el("div", { className: `card ${t.status}`, tabIndex: 0, role: "button" },
-          el("div", { className: "id", textContent: t.id }),
-          el("div", { className: "title", textContent: t.title }),
-          el("div", { className: "meta" },
-            ...(t.status === "cancelled" ? [el("span", { className: "tag", textContent: "中止" })] : []),
-            ...(t.priority === "high" ? [el("span", { className: "tag high", textContent: "優先" })] : []),
-            ...(t.parent ? [el("span", { className: "tag", textContent: `↳ ${t.parent}` })] : []),
-            ...(t.children.length ? [el("span", { className: "tag", textContent: `子 ${t.children.length}` })] : []),
-            ...(t.waitingOn.length ? [el("span", { className: "tag wait", textContent: `待ち ${t.waitingOn.map((w) => w.id).join(", ")}` })] : []),
-            ...(t.milestone ? [el("span", { className: "tag", textContent: t.milestone })] : []),
-            ...t.labels.map((l) => el("span", { className: "tag", textContent: l })),
-            ...(t.branch ? [el("span", { className: "tag", textContent: t.branch })] : []),
-          ),
-        );
-        card.onclick = () => showTask(t.id);
-        card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showTask(t.id); } };
-        return card;
-      }) : [el("div", { className: "empty", textContent: "なし" })])),
-      ...pager(status, LIST_SIZE.column, paged),
-    );
+  const inGroupOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
+  board.classList.remove("focusing");
+  board.replaceChildren(...GROUPS.map(([status, label]) => {
+    // 未着手は着手する順（order）。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く。
+    // 完了・中止は新しい順。ほかは優先のものを先に、新しい順
+    const items = shown.filter(inGroupOf(status)).sort((a, b) =>
+      status === "todo" ? (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id)
+      : status === "done" ? b.updated.localeCompare(a.updated)
+      : PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || b.updated.localeCompare(a.updated));
+    const summary = el("summary", {}, el("span", { className: "sq" }), label, el("span", { className: "n", textContent: items.length }));
+    if (!items.length) {
+      // 空のグループは見出しだけ置き、開閉させない
+      summary.onclick = (e) => e.preventDefault();
+      return el("details", { className: "group empty", style: `--c: var(--${status})` }, summary);
+    }
+    const paged = pagedList(status, LIST_SIZE.group, items);
+    const group = el("details", { className: "group", style: `--c: var(--${status})`, open: isOpen(status) },
+      summary, ...paged.shown.map(rowOf), ...pager(status, LIST_SIZE.group, paged));
+    group.ontoggle = () => {
+      if (group.open === isOpen(status)) return;
+      openGroups[status] = group.open;
+      localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups));
+    };
+    return group;
   }));
 
   const pagedDecisions = pagedList("decisions", LIST_SIZE.decisions, decisions.slice().reverse());
