@@ -22,6 +22,13 @@
   @media (max-width: 1100px) {
     :root:not([data-theme="tategaki"]) main { grid-template-columns: minmax(0, 1fr); }
     :root:not([data-theme="tategaki"]) .alert-list { grid-template-columns: minmax(0, 1fr); }
+    /* 1 列のときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン）にする */
+    .col { display: contents; }
+    .col-main > :nth-child(1) { order: 1; }
+    .col-side > :nth-child(1) { order: 2; }
+    .col-main > :nth-child(2) { order: 3; }
+    .col-side > :nth-child(2) { order: 4; }
+    main > .span { order: 5; }
   }
   @media (max-width: 760px) {
     :root:not([data-theme="tategaki"]) main { padding: 20px 16px 110px; gap: 36px; }
@@ -54,23 +61,28 @@
   <div class="errors" id="errors"></div>
   <div class="stats" id="stats"></div>
   <main>
-    <section>
-      <h2 class="h red"><b>NOW</b><small>進行中</small></h2>
-      <div class="now-list" id="now"></div>
-    </section>
-    <aside>
-      <h2 class="h"><b>NEXT</b><small>次にやる順</small></h2>
-      <ol class="queue" id="queue"></ol>
-      <div id="queue-pager"></div>
-    </aside>
-    <section>
-      <h2 class="h red"><b>ALERT</b><small>確認待ち・止まっている</small></h2>
-      <div class="alert-list" id="alerts"></div>
-    </section>
-    <aside>
-      <h2 class="h"><b>MILESTONE</b><small>マイルストーン</small></h2>
-      <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
-    </aside>
+    <!-- 左右の列は別々に上から詰める。片方が長くても、もう片方の下に隙間を作らない -->
+    <div class="col col-main">
+      <section>
+        <h2 class="h red"><b>NOW</b><small>進行中</small></h2>
+        <div class="now-list" id="now"></div>
+      </section>
+      <section>
+        <h2 class="h red"><b>ALERT</b><small>確認待ち・止まっている</small></h2>
+        <div class="alert-list" id="alerts"></div>
+      </section>
+    </div>
+    <div class="col col-side">
+      <aside>
+        <h2 class="h"><b>NEXT</b><small>次にやる順</small></h2>
+        <ol class="queue" id="queue"></ol>
+        <div id="queue-pager"></div>
+      </aside>
+      <aside>
+        <h2 class="h"><b>MILESTONE</b><small>マイルストーン</small></h2>
+        <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
+      </aside>
+    </div>
     <section class="span">
       <h2 class="h"><b>CLEARED</b><small>終わったもの</small><span class="n" id="cleared-n"></span></h2>
       <div class="cleared" id="cleared"></div>

@@ -33,8 +33,8 @@
 
   /* 段組み: 右の段は縦の罫で分ける */
   main { gap: 40px 0; padding-top: 28px; }
-  main > aside { border-left: 1px solid var(--rule); padding-left: 32px; }
-  main > section:not(.span) { padding-right: 32px; }
+  .col-side { border-left: 1px solid var(--rule); padding-left: 32px; }
+  .col-main { padding-right: 32px; }
   main > .span { border-top: 1px solid var(--rule); padding-top: 22px; }
 
   /* 見出し: 和文を大きく、欧文は添える */

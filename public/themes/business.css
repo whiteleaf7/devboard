@@ -30,7 +30,7 @@
 
   /* 区画: 白いパネル */
   main { gap: 20px; padding: 20px 32px 110px; }
-  main > section, main > aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  main section, main aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
   .h { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
   .h b { display: none; }
   .h small { font-size: 1rem; font-weight: 600; }

@@ -35,7 +35,8 @@
 
   /* 本文: 段が右から左へ並ぶ */
   main { display: flex; flex-direction: column; gap: 40px; padding: 40px 36px; max-width: none; }
-  main > section, main > aside { border-left: 1px solid var(--line); padding-left: 36px; }
+  /* 縦書きは段を右から左へ一続きに流すので、左右の列の箱はほどく（並ぶ順は board.css） */
+  main section, main aside { border-left: 1px solid var(--line); padding-left: 36px; }
 
   /* 見出し: 右に朱の線 */
   .h { display: flex; align-items: center; gap: 12px; margin-left: 20px; border-right: 4px solid var(--shu); padding-right: 10px; }
