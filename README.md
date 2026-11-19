@@ -43,6 +43,7 @@ AI 自律開発のための開発ボード。タスク・教訓・マイルス�
 - プロジェクトは、コマンドを打った場所（サブディレクトリや linked worktree でもよい）の git の main の worktree。別の場所は `DEVBOARD_ROOT` で指す
 - `devboard start` は前面で動き続けて戻らない。`devboard open` はブラウザを開く。AI が自分で打つ必要はなく、ユーザーに見せたいときは `devboard tailscale` を打ち、出た URL を渡す。Tailscale が動いていないときだけ、MCP の `open_dashboard` が返すローカルの URL を渡す
 - ダッシュボードは読み取り専用。ボードに書けるのは MCP と `devboard apply` だけ。待ち受けは `127.0.0.1` のみ
+- 動いているダッシュボードは、devboard のコードが更新される（このリポジトリの HEAD が変わる）と、同じポートで新しいコードに立て直す
 - ボードは `~/.devboard/boards/<プロジェクトのディレクトリ名>.sqlite`（`DEVBOARD_DB` で変更可）。プロジェクトの git の外にあり、変更はすべてイベントとして追記する。実験や検証は `devboard snapshot <ファイル>` で写しを取り、`DEVBOARD_DB` をその写しに向けて行う。本物のボードで試さない
 - 決定記録はプロジェクトの `docs/decisions/NNNN-slug.md`
 - 教訓には、差分から読み取れる引き金（`trigger`: 変えたパスの接頭辞 `paths`、変えた行に現れる語 `words`、当たったときに確かめること `check`）を付けられる（`add_lesson`、あとからは `update_lesson`）。当たった教訓だけが、`devboard checklist`（autodev はコミットのときに出す）と、`paths` の重なるタスクの `get_task` の `checklist` に出る。止めはしない
@@ -87,7 +88,7 @@ devboard は全プロジェクトで共有するので、プロジェクトの�
 | `devboard lint-decisions`     | 標準入力の決定記録（JSON `[{file,text}]`）の形式を検査し、問題を JSON で出す（あれば終了コード 1。CI から使える） |
 | `devboard import-history`     | git の履歴にある古いボードを、空の SQLite のボードに取り込む     |
 
-環境変数: `DEVBOARD_ROOT`（プロジェクトの場所）、`DEVBOARD_DB`（ボードのファイル）、`DEVBOARD_PORT`（既定 4848）、`DEVBOARD_TS_PORT`（既定 8448）、`DEVBOARD_HOSTS`（ダッシュボードに許可する tailnet の名前を足す。カンマ区切り）。
+環境変数: `DEVBOARD_ROOT`（プロジェクトの場所）、`DEVBOARD_DB`（ボードのファイル）、`DEVBOARD_PORT`（ダッシュボードのポート。指定が無ければ 4848 から、ほかのプロジェクトが使っていない番号を探す）、`DEVBOARD_TS_PORT`（既定 8448）、`DEVBOARD_HOSTS`（ダッシュボードに許可する tailnet の名前を足す。カンマ区切り）。
 
 ## このリポジトリを開発する
 

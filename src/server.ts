@@ -7,11 +7,16 @@
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と決定記録のディレクトリと .git の変更で送る
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
+// ポートは DEVBOARD_PORT。指定が無ければ 4848 から、ほかのプロジェクトのダッシュボードが使っていない番号を探す。
+// 使った URL は .dev/devboard.json に記録し、launcher.ts と tailscale.ts はそれを見る。
+// devboard のコードが更新されたら（リポジトリの HEAD が変わったら）、同じポートで新しいコードのサーバに立て直す
 // 読み取り専用。ボードへの書き込みは MCP と `devboard apply` だけが行う。
 // tailscale serve で中継するときは、tailnet 上の名前（*.ts.net）も Host に許可する。
 // 許可する名前は起動時に `tailscale status` から取る。DEVBOARD_HOSTS（カンマ区切り）で足せる。
 
+import { execFile, spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import { readdirSync, readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
@@ -21,6 +26,9 @@ import { tailnetName } from "./tailnet.ts";
 import { decisionsDir, repoRoot, snapshot } from "./store.ts";
 
 export const DEFAULT_PORT = 4848;
+// 指定が無いとき、4848 から数えて何番まで探すか
+const PORT_TRIES = 20;
+const CODE_POLL_MS = 5000;
 const BOARD_POLL_MS = 500;
 
 export function instanceFile(): string {
@@ -69,9 +77,13 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
 }
 
 // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
+const configuredPort = () => process.env.DEVBOARD_PORT ?? process.env.NAGAYA_DEV_PORT;
+
+// fallback が真なら、port が使われているときに次の番号を順に試す。ポートを指定されたときは、その番号だけを使う
 export function startServer(
-  port = Number(process.env.DEVBOARD_PORT ?? process.env.NAGAYA_DEV_PORT ?? DEFAULT_PORT),
+  port = Number(configuredPort() ?? DEFAULT_PORT),
   remote = remoteHosts(),
+  fallback = configuredPort() === undefined,
 ) {
   const clients = new Set<ServerResponse>();
   let timer: NodeJS.Timeout | undefined;
@@ -149,8 +161,13 @@ export function startServer(
     }
   });
 
+  let tries = 0;
+  server.on("error", (e: NodeJS.ErrnoException) => {
+    if (e.code !== "EADDRINUSE" || !fallback || ++tries >= PORT_TRIES) throw e;
+    server.listen(port + tries, "127.0.0.1");
+  });
   server.listen(port, "127.0.0.1", () => {
-    const url = `http://127.0.0.1:${port}/`;
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
     mkdirSync(join(repoRoot(), ".dev"), { recursive: true });
     writeFileSync(instanceFile(), JSON.stringify({ url, pid: process.pid }) + "\n");
     console.log(`devboard: ${url}`);
@@ -167,12 +184,53 @@ export function startServer(
   return { server, close };
 }
 
+// devboard のコードの版。リポジトリの HEAD のコミットで見る（保存のたびではなく、切り替え・pull・コミットのときに変わる）。
+// git が無ければ null で、立て直しはしない
+function codeVersion(): Promise<string | null> {
+  return new Promise((resolve) =>
+    execFile("git", ["rev-parse", "HEAD"], { cwd: join(import.meta.dirname, ".."), timeout: 3000 }, (err, out) =>
+      resolve(err ? null : out.trim()),
+    ),
+  );
+}
+
 if (import.meta.main) {
-  const { close } = startServer();
+  const { server, close } = startServer();
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(versionPoll);
+    close();
+  };
   for (const sig of ["SIGINT", "SIGTERM"] as const) {
     process.on(sig, () => {
-      close();
+      stop();
       process.exit(0);
     });
   }
+
+  // 画面のファイル（public/）はリクエストのたびに読むが、サーバのコードは起動したときのまま。
+  // コードが変わったら、新しい画面に古いサーバが答えて食い違わないよう、同じポートで立て直す
+  const started = await codeVersion();
+  const versionPoll = setInterval(async () => {
+    const now = await codeVersion();
+    if (!started || !now || now === started || stopped) return;
+    const port = String((server.address() as AddressInfo).port);
+    console.log(`devboard のコードが更新された（${started.slice(0, 7)} → ${now.slice(0, 7)}）。立て直す`);
+    stop();
+    await new Promise((r) => server.once("close", r));
+    const env = { ...process.env, DEVBOARD_PORT: port };
+    if (process.env.DEVBOARD_BACKGROUND) {
+      // devboard open が裏で起動したもの: 新しいサーバを同じく裏で起動し、自分は終わる
+      spawn(process.execPath, [import.meta.filename], { cwd: process.cwd(), env, detached: true, stdio: "inherit" }).unref();
+      process.exit(0);
+    }
+    // devboard start で前面にいるもの: 端末に居座ったまま新しいサーバを子として動かし、止める合図を渡す
+    const child = spawn(process.execPath, [import.meta.filename], { cwd: process.cwd(), env, stdio: "inherit" });
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+    for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => child.kill(sig));
+    child.on("exit", (code) => process.exit(code ?? 0));
+  }, CODE_POLL_MS);
 }
