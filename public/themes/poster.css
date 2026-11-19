@@ -112,9 +112,8 @@
   .reason { font-size: .95rem; font-weight: 700; border-left: 5px solid var(--red); padding: 4px 0 4px 10px; margin-bottom: 10px; }
   .check .reason { border-color: var(--ink); }
 
-  /* 次にやる順: 階段状 */
+  /* 次にやる順 */
   .queue { gap: 10px; }
-  .queue li { margin-left: calc(var(--i) * 16px); }
   .queue .num { font: italic 800 4rem/.9 var(--display); color: transparent; -webkit-text-stroke: 2px var(--paper); text-align: right; padding-right: 10px; }
   .queue .plate { position: relative; background: var(--ink); border: 2px solid var(--paper); padding: 10px 16px; transform: skewX(-12deg); }
   .queue .plate > * { transform: skewX(12deg); }

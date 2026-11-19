@@ -120,9 +120,8 @@
   .card-title { font-size: 1.3rem; font-weight: 900; line-height: 1.35; margin: 8px 0 12px; }
   .reason { font-size: .95rem; font-weight: 700; border-left: 5px solid var(--red); padding: 4px 0 4px 10px; margin-bottom: 10px; }
 
-  /* 次にやる順: 階段状 */
+  /* 次にやる順 */
   .queue { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-  .queue li { position: relative; display: grid; grid-template-columns: 76px 1fr auto; align-items: center; margin-left: calc(var(--i) * 16px); }
   .queue .num { font: italic 800 4rem/.9 var(--display); color: var(--ink); text-align: right; padding-right: 12px; }
   .queue .plate { background: var(--card); border: 3px solid var(--ink); padding: 10px 16px; transform: skewX(-12deg); }
   .queue .plate > * { transform: skewX(12deg); }
