@@ -153,4 +153,17 @@
   .cutin .what b { display: block; font-family: var(--gothic); font-size: .85rem; font-weight: 400; color: var(--usuzumi); }
   .cutin .band::after { content: "完"; position: absolute; left: 30px; bottom: 34px; width: 72px; height: 72px; display: grid; place-items: center;
     background: var(--shu); color: #fff; font-size: 2.2rem; font-weight: 800; border-radius: 6px; rotate: -8deg; writing-mode: horizontal-tb; }
+
+  /* ダイアログ: 掛け軸。和紙の面に上下の軸、見出しは明朝で朱の線を添える。読みやすさのため本文は横書き */
+  --ui-bg: #ebe4d3; --ui-panel: #f6f1e4; --ui-ink: #1f1d1a; --ui-sub: #615b51; --ui-line: #d6cdb9; --ui-radius: 2px;
+  --st-todo: #615b51; --st-doing: #1f1d1a; --st-review: #615b51; --st-blocked: #b5341f; --st-done: #3b6b4a;
+  dialog { font-family: var(--mincho); border: 1px solid var(--line); border-top: 14px solid #3b2a1a; border-bottom: 14px solid #3b2a1a; border-radius: 2px;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, .35); accent-color: var(--shu); }
+  dialog[open] { animation: ink-in .5s ease both; }
+  dialog::backdrop { background: rgba(31, 29, 26, .4); }
+  dialog h3 { font-weight: 700; letter-spacing: .06em; border-left: 4px solid var(--shu); padding-left: 10px; }
+  dialog .view-section h4, #settings legend { font-weight: 700; color: var(--ink); letter-spacing: .1em; }
+  dialog .md { line-height: 1.9; }
+  dialog .props dt, dialog .view-head .id, dialog .tag, dialog .note time, dialog button.secondary { font-family: var(--gothic); }
+  dialog button.secondary { border-radius: 2px; border-color: var(--shu); color: var(--shu); }
 }

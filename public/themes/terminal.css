@@ -151,4 +151,19 @@
   .cutin .word::after { content: "_"; animation: blink .6s steps(2) infinite; }
   .cutin .what { display: block; margin-top: 14px; font-size: 1.1rem; }
   .cutin .what b { display: block; color: var(--dim); font-size: .9rem; font-weight: 400; }
+
+  /* ダイアログ: 端末の窓。琥珀色の枠と等幅の字、開くとちらつく */
+  --ui-bg: #1b150a; --ui-panel: #0e0b06; --ui-ink: #ffd89a; --ui-sub: #c19447; --ui-line: #5a4420; --ui-radius: 0;
+  --st-todo: #c19447; --st-doing: #ffb43a; --st-review: #ffd89a; --st-blocked: #ff7255; --st-done: #9be37a;
+  dialog { font-family: var(--mono); border: 1px solid var(--amber); border-radius: 0; box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px var(--line), 0 0 40px rgba(255, 180, 58, .15);
+    text-shadow: 0 0 6px rgba(255, 180, 58, .2); accent-color: var(--amber); }
+  dialog[open] { animation: flicker .4s steps(4) both; }
+  dialog::backdrop { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .4) 0 1px, transparent 1px 3px), rgba(8, 6, 3, .82); }
+  dialog h3 { color: var(--hi); }
+  dialog h3::before { content: "> "; color: var(--dim); }
+  dialog .view-section h4::before, #settings legend::before { content: "## "; }
+  dialog .md code, dialog .md pre { border-radius: 0; }
+  dialog button.secondary { border-radius: 0; border-color: var(--amber); color: var(--amber); }
+  dialog button.secondary::before { content: "["; }
+  dialog button.secondary::after { content: "]"; }
 }

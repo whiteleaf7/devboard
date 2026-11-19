@@ -192,4 +192,16 @@
   .op:hover, .hazard:hover, .check:hover, .file:hover { translate: -4px -6px; }
   .queue li:hover { translate: 10px 0; }
   .tile:hover { scale: 1.03; }
+
+  /* ダイアログ: 紙の面に黒い枠と赤い影。開くと横から飛び込む */
+  --ui-bg: #f2ede3; --ui-panel: #fffdf8; --ui-ink: #121212; --ui-sub: #5f5a52; --ui-line: #d8d1c3; --ui-radius: 0;
+  --st-todo: #5f5a52; --st-doing: #1f5fa8; --st-review: #7a45b8; --st-blocked: #c40d22; --st-done: #2f7a4b;
+  dialog { font-family: var(--jp); border: 3px solid var(--ink); border-radius: 0; box-shadow: 12px 12px 0 var(--red); accent-color: var(--red); }
+  dialog[open] { animation: slam .45s cubic-bezier(.2, 1.4, .4, 1) both; }
+  dialog::backdrop { background: repeating-linear-gradient(-45deg, rgba(215, 15, 38, .16) 0 16px, rgba(18, 18, 18, .5) 16px 32px); }
+  dialog h3 { font-weight: 900; letter-spacing: .02em; }
+  dialog h3::before { content: ""; display: inline-block; width: .5em; height: 1em; margin-right: .4em; background: var(--red); transform: skewX(-14deg); vertical-align: -0.12em; }
+  dialog .view-head .id { font: italic 800 1.2rem/1 var(--display); color: var(--ink); }
+  dialog .view-section h4, #settings legend { font: italic 800 1rem/1 var(--display); letter-spacing: .08em; color: var(--ink); }
+  dialog button.secondary { background: var(--ink); color: var(--white); border: 0; border-radius: 0; font-weight: 900; transform: skewX(-12deg); }
 }

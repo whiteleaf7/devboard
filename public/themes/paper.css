@@ -143,4 +143,18 @@
   .cutin .what { font-size: 1.9rem; font-weight: 700; line-height: 1.35; }
   .cutin .what b { display: block; font-family: var(--sans); font-size: .85rem; font-weight: 400; color: var(--sub); margin-bottom: 8px; }
   .cutin .what::after { content: "完了す"; display: block; color: var(--accent); font-size: 1.1rem; margin-top: 10px; }
+
+  /* ダイアログ: 紙面の切り抜き。二重の罫で囲み、見出しは明朝で大きく */
+  --ui-bg: #ebe5d6; --ui-panel: #f6f2e8; --ui-ink: #1c1b18; --ui-sub: #5e594f; --ui-line: #cfc8b8; --ui-radius: 0;
+  --st-todo: #5e594f; --st-doing: #1c1b18; --st-review: #5e594f; --st-blocked: #9e1b16; --st-done: #1c1b18;
+  dialog { font-family: var(--serif); border: 4px double var(--rule); border-radius: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, .28); accent-color: var(--accent); }
+  dialog[open] { animation: fade .35s ease both; }
+  dialog::backdrop { background: rgba(28, 27, 24, .4); }
+  dialog h3 { font-weight: 700; border-bottom: 2px solid var(--rule); padding-bottom: 8px; }
+  dialog .view-title { font-size: 1.9rem; line-height: 1.35; }
+  dialog .view-section { border-top: 1px solid var(--rule); }
+  dialog .view-section h4, #settings legend { font-size: 1rem; font-weight: 700; color: var(--ink); }
+  dialog .md { line-height: 1.9; }
+  dialog .props dt, dialog .view-head .id, dialog .tag, dialog .note time, dialog button.secondary { font-family: var(--sans); }
+  dialog button.secondary { border-radius: 0; border-color: var(--rule); }
 }

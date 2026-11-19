@@ -166,4 +166,16 @@
   .cutin .word::before { content: "COMPLETE!!"; }
   .cutin .what { position: relative; z-index: 1; font-size: 1.6rem; font-weight: 900; background: var(--bg); padding: 10px 24px; border-radius: 999px; animation: wave 1s ease-in-out infinite; }
   .cutin .what b { color: var(--yellow); margin-right: 10px; font: italic 800 1.8rem/1 var(--display); }
+
+  /* ダイアログ: 宙に浮くガラスの板。虹色の見出し、開くと奥から飛んでくる */
+  --ui-bg: rgba(255, 255, 255, .08); --ui-panel: rgba(22, 12, 54, .88); --ui-ink: #fff; --ui-sub: #c8c0ff; --ui-line: rgba(255, 255, 255, .22); --ui-radius: 10px;
+  --st-todo: #c8c0ff; --st-doing: var(--cyan); --st-review: var(--violet); --st-blocked: var(--pink); --st-done: #5cf2a6;
+  dialog { font-family: var(--jp); border: 1px solid rgba(255, 255, 255, .3); border-radius: 26px; backdrop-filter: blur(16px);
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, .4), 0 30px 80px rgba(124, 92, 255, .45); accent-color: var(--pink); }
+  dialog[open] { animation: warp-in .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+  dialog::backdrop { background: radial-gradient(circle at center, rgba(124, 92, 255, .35), rgba(7, 4, 26, .85) 70%); }
+  dialog h3 { font-weight: 900; background: var(--rainbow); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: flow 4s linear infinite; }
+  dialog .view-section h4, #settings legend { color: var(--cyan); font-weight: 800; }
+  dialog .md a { color: var(--cyan); }
+  dialog button.secondary { background: linear-gradient(90deg, var(--pink), var(--violet)); color: #fff; border: 0; border-radius: 999px; font-weight: 800; }
 }
