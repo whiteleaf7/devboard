@@ -28,7 +28,8 @@ import { decisionsDir, repoRoot, snapshot } from "./store.ts";
 export const DEFAULT_PORT = 4848;
 // 指定が無いとき、4848 から数えて何番まで探すか
 const PORT_TRIES = 20;
-const CODE_POLL_MS = 5000;
+// コードの更新を見る間隔。git を呼ぶので、プロジェクトの数だけ動くサーバに負担をかけない程度に空ける
+const CODE_POLL_MS = 30_000;
 const BOARD_POLL_MS = 500;
 
 export function instanceFile(): string {
