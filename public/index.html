@@ -28,6 +28,10 @@
     :root:not([data-theme="tategaki"]) .top { flex-wrap: wrap; gap: 10px 16px; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
     :root:not([data-theme="tategaki"]) .stats { padding-left: 16px; padding-right: 16px; }
     :root:not([data-theme="tategaki"]) .errors { margin: 12px 16px 0; }
+    /* 一覧の列の最小幅や、階段状のずらし・斜めの札が、狭い画面の幅を超えないようにする */
+    :root:not([data-theme="tategaki"]) .cleared, :root:not([data-theme="tategaki"]) .files { grid-template-columns: minmax(0, 1fr); }
+    :root:not([data-theme="tategaki"]) .queue { padding-right: 10px; }
+    :root:not([data-theme="tategaki"]) .queue li { margin-left: 0; }
     dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 12px 12px 0 0; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     #task, #settings { width: 100vw; }
     .view-head button { min-height: 40px; }
@@ -136,6 +140,8 @@ const FINISHED = ["done", "cancelled"];
 const NOTE_MAX = 140;
 // マイルストーンの目盛りは、終わったものから順に並べる
 const SEG_ORDER = ["done", "review", "doing", "blocked", "todo"];
+// マイルストーンの目盛りのコマの数の上限。タスクが多いと、コマの枠と隙間だけで列の幅を超えるので、何件かずつまとめる
+const SEG_MAX = 24;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const CUTIN_MS = 2600;
 
@@ -400,6 +406,17 @@ function asTask(node, t) {
   return node;
 }
 
+// マイルストーンの目盛り。タスクは終わったものから順に並んでいる。SEG_MAX 件までは 1 件 1 コマ、
+// それより多ければ SEG_MAX コマに等分し、全部終わったコマは done、作業中か確認待ちを含むコマは doing にする
+function segments(tasks) {
+  const count = Math.min(tasks.length, SEG_MAX);
+  return Array.from({ length: count }, (_, i) => {
+    const part = tasks.slice(Math.floor((i * tasks.length) / count), Math.floor(((i + 1) * tasks.length) / count));
+    const className = part.every((t) => t.status === "done") ? "done" : part.some((t) => ["doing", "review"].includes(t.status)) ? "doing" : "";
+    return el("i", { className, title: part.length === 1 ? `${part[0].id} ${part[0].title}` : `${part[0].id}〜${part.at(-1).id}（${part.length} 件）` });
+  });
+}
+
 // ---- 描画 ----
 // 入ってくる動き（.rise）は、開いた直後・テーマを変えたとき・新しく現れたカードだけに出す。
 // 変更の通知のたびに描き直すので、前からあるカードは動きを先送りして終えた形で置き、続けて揺れる動きだけを残す
@@ -500,8 +517,7 @@ function render() {
         el("span", { className: "state", textContent: { planned: "予定", active: "進行中", done: "完了" }[m.status] }),
         el("span", { className: "pct" }, String(pct), el("small", { textContent: "%" }))),
       ...(m.goal ? [el("div", { className: "goal", textContent: m.goal })] : []),
-      el("div", { className: "segs" }, ...mine.map((t) => el("i", {
-        className: t.status === "done" ? "done" : ["doing", "review"].includes(t.status) ? "doing" : "", title: `${t.id} ${t.title}` }))));
+      el("div", { className: "segs" }, ...segments(mine)));
     enter(node, `ms:${m.id}`);
     node.setAttribute("aria-pressed", String(filter === m.id));
     const toggle = () => { filter = filter === m.id ? null : m.id; render(); };
