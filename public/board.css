@@ -36,13 +36,14 @@ main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); g
 main > * { min-width: 0; }
 .col { display: grid; row-gap: inherit; align-content: start; min-width: 0; }
 .col > * { min-width: 0; }
-/* 縦書きのように 1 列に並べるときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン）にする */
+/* 縦書きのように 1 列に並べるときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン・終わったもの）にする */
 :root[data-theme="tategaki"] .col { display: contents; }
 :root[data-theme="tategaki"] .col-main > :nth-child(1) { order: 1; }
 :root[data-theme="tategaki"] .col-side > :nth-child(1) { order: 2; }
 :root[data-theme="tategaki"] .col-main > :nth-child(2) { order: 3; }
 :root[data-theme="tategaki"] .col-side > :nth-child(2) { order: 4; }
-:root[data-theme="tategaki"] .span { order: 5; }
+:root[data-theme="tategaki"] .col-main > :nth-child(3) { order: 5; }
+:root[data-theme="tategaki"] .span { order: 6; }
 .span { grid-column: 1 / -1; }
 .h { margin: 0; }
 .logo { margin: 0; font-size: inherit; font-weight: inherit; }

@@ -19,16 +19,20 @@
 <link rel="stylesheet" href="/themes/motion.css">
 <style>
   /* 幅が狭いときの並べ方。テーマの指定より後に置いて、どのテーマでも 1 段にする（縦書きは横に流れるので除く） */
+  /* 左の列の終わったものは、縦に 1 件ずつ並べる（縦書きは横に流れるので除く） */
+  :root:not([data-theme="tategaki"]) .col .cleared { grid-template-columns: minmax(0, 1fr); }
+  :root:not([data-theme="tategaki"]) .col .tile { min-height: 0; }
   @media (max-width: 1100px) {
     :root:not([data-theme="tategaki"]) main { grid-template-columns: minmax(0, 1fr); }
     :root:not([data-theme="tategaki"]) .alert-list { grid-template-columns: minmax(0, 1fr); }
-    /* 1 列のときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン）にする */
+    /* 1 列のときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン・終わったもの）にする */
     .col { display: contents; }
     .col-main > :nth-child(1) { order: 1; }
     .col-side > :nth-child(1) { order: 2; }
     .col-main > :nth-child(2) { order: 3; }
     .col-side > :nth-child(2) { order: 4; }
-    main > .span { order: 5; }
+    .col-main > :nth-child(3) { order: 5; }
+    main > .span { order: 6; }
   }
   @media (max-width: 760px) {
     :root:not([data-theme="tategaki"]) main { padding: 20px 16px 110px; gap: 36px; }
@@ -71,6 +75,11 @@
         <h2 class="h red"><b>ALERT</b><small>確認待ち・止まっている</small></h2>
         <div class="alert-list" id="alerts"></div>
       </section>
+      <section>
+        <h2 class="h"><b>CLEARED</b><small>終わったもの</small><span class="n" id="cleared-n"></span></h2>
+        <div class="cleared" id="cleared"></div>
+        <div id="cleared-pager"></div>
+      </section>
     </div>
     <div class="col col-side">
       <aside>
@@ -83,11 +92,6 @@
         <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
       </aside>
     </div>
-    <section class="span">
-      <h2 class="h"><b>CLEARED</b><small>終わったもの</small><span class="n" id="cleared-n"></span></h2>
-      <div class="cleared" id="cleared"></div>
-      <div id="cleared-pager"></div>
-    </section>
     <section class="span">
       <h2 class="h red"><b>DECISION</b><small>決定記録</small></h2>
       <div class="files" id="files"></div>
