@@ -1,0 +1,205 @@
+/* ボードの画面の土台。どのテーマにも共通の骨組み・ダイアログ・動きの定義だけを持ち、色・字・形は themes/*.css が決める。
+   活動の画面は base.css を使う。ここの変数は、テーマの変数とぶつからないよう --ui- と --st- で始める */
+:root {
+  color-scheme: light;
+  --ui-bg: #f6f5f2; --ui-panel: #ffffff; --ui-ink: #1f1e1c; --ui-sub: #6b6862; --ui-line: #e3e0da;
+  --ui-error-bg: #fbeae8; --ui-error-ink: #8a2a22; --ui-radius: 6px;
+  --st-todo: #8a8780; --st-doing: #2f6fb5; --st-review: #8a5cc2; --st-blocked: #c2453a; --st-done: #3d8a5a;
+  /* 文字の大きさの段。ベース（1rem）は設定の「文字の大きさ」で変わり、ほかの段もそれに比例する */
+  --fs-2xs: 0.643rem; --fs-xs: 0.786rem; --fs-sm: 0.857rem; --fs-md: 0.929rem; --fs-base: 1rem;
+  --fs-lg: 1.071rem; --fs-xl: 1.286rem; --fs-2xl: 1.429rem;
+  font-size: 15px;
+}
+:root[data-font-size="small"] { font-size: 14px; }
+:root[data-font-size="large"] { font-size: 16px; }
+:root[data-font-size="xlarge"] { font-size: 18px; }
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+  --ui-bg: #1b1a18; --ui-panel: #252422; --ui-ink: #ecebe8; --ui-sub: #9c9890; --ui-line: #3a3835;
+  --ui-error-bg: #3a2220; --ui-error-ink: #f0b4ad;
+}
+* { box-sizing: border-box; }
+body { margin: 0; overflow-x: hidden; }
+[hidden] { display: none !important; }
+
+/* ---- 骨組み ---- */
+.bg { position: fixed; inset: 0; z-index: -1; }
+.bg i { position: absolute; inset: 0; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; }
+/* ヘッダーの部品は潰さず、入りきらなければ次の段へ送る */
+.top > :not(.spacer) { flex: none; white-space: nowrap; }
+/* ブランチ名は長いことがあるので、画面の幅を超えるときは折り返す */
+.top > .branch { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.spacer { flex: 1; }
+.stats { display: flex; flex-wrap: wrap; }
+main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px 48px; padding: 32px 48px 150px; max-width: 1640px; }
+main > * { min-width: 0; }
+.col { display: grid; row-gap: inherit; align-content: start; min-width: 0; }
+.col > * { min-width: 0; }
+/* 縦書きのように 1 列に並べるときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン・終わったもの）にする */
+:root[data-theme="tategaki"] .col { display: contents; }
+:root[data-theme="tategaki"] .col-main > :nth-child(1) { order: 1; }
+:root[data-theme="tategaki"] .col-side > :nth-child(1) { order: 2; }
+:root[data-theme="tategaki"] .col-main > :nth-child(2) { order: 3; }
+:root[data-theme="tategaki"] .col-side > :nth-child(2) { order: 4; }
+:root[data-theme="tategaki"] .col-main > :nth-child(3) { order: 5; }
+:root[data-theme="tategaki"] .span { order: 6; }
+.span { grid-column: 1 / -1; }
+.h { margin: 0; }
+.logo { margin: 0; font-size: inherit; font-weight: inherit; }
+/* 親タスクの名前。本題より目立たないよう、上に小さく薄い 1 行で出し、長ければ末尾を切る（全文は title） */
+.crumb { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin: 0 0 2px; font-size: .78em; font-weight: normal; opacity: .7; }
+.now-list, .ms-list { display: grid; }
+.alert-list { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+.queue { list-style: none; padding: 0; margin: 0; display: grid; }
+.queue li { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; }
+/* 1 行で切る親タスクの名前が、札を広げて列からはみ出さないようにする */
+.queue li, .queue li > *, .now-list > *, .alert-list > * { min-width: 0; }
+.cleared { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 30px 22px; }
+.chips { display: inline-flex; gap: 6px; flex-wrap: wrap; vertical-align: middle; }
+.chip { display: inline-block; }
+.kids { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 4px; vertical-align: middle; }
+.segs { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
+.segs i { min-width: 0; }
+.op, .hazard, .check, .tile, .file { position: relative; }
+.op, .hazard, .check, .queue li, .tile, .file, .ms { cursor: pointer; transition: translate .15s, scale .15s, background .15s; }
+.op h3, .card-title, .queue .t, .tile .tt, .file .ft, .bubble, .reason, .ms .title, .ms .goal, .op .foot .br, .chip { overflow-wrap: anywhere; }
+.ticker { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; overflow: hidden; z-index: 5; }
+.ticker .tag { flex: none; height: 100%; display: grid; place-items: center; padding: 0 30px 0 22px; z-index: 1; }
+.ticker .track { display: flex; white-space: nowrap; animation: scroll 48s linear infinite; }
+.ticker .track span { padding: 0 22px; }
+.cutin { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: none; }
+.cutin.show { display: block; }
+
+/* どのテーマでも、テーマの字の色をそのまま使う小さな部品 */
+.pages { display: flex; gap: 4px; }
+.pages a { color: inherit; text-decoration: none; padding: 2px 8px; opacity: .65; border-bottom: 2px solid transparent; }
+.pages a:hover { opacity: 1; }
+.pages a[aria-current="page"] { opacity: 1; font-weight: 700; border-bottom-color: currentColor; }
+.top-button, .pager button, .ms-more { font: inherit; font-size: var(--fs-sm); color: inherit; background: transparent; border: 1px solid currentColor;
+  border-radius: 4px; padding: 3px 12px; cursor: pointer; opacity: .8; text-shadow: none; }
+.top-button:hover, .pager button:hover, .ms-more:hover { opacity: 1; }
+.pager { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+.ms-more { justify-self: start; margin-top: 4px; }
+.none { opacity: .65; font-size: var(--fs-sm); padding: 4px 0; }
+.live:not(.on) { opacity: .35; filter: grayscale(1); }
+.errors { margin: 16px 48px 0; background: var(--ui-error-bg); color: var(--ui-error-ink); border-radius: var(--ui-radius); padding: 8px 12px; white-space: pre-wrap; font-size: var(--fs-sm); }
+.errors:empty { display: none; }
+/* マイルストーンで絞り込んでいるとき、マウスを乗せたタスクとつながるタスク */
+.ms[aria-pressed="true"] { outline: 3px solid currentColor; outline-offset: 4px; }
+.related { outline: 3px dashed currentColor; outline-offset: 4px; }
+
+/* ---- 関係するタスクの浮き札 ---- */
+.hovercard { position: fixed; z-index: 10; width: max-content; max-width: min(480px, 90vw); background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-line);
+  border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); padding: 8px 12px 10px; font-size: var(--fs-sm); pointer-events: none;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; text-shadow: none; writing-mode: horizontal-tb; }
+.hovercard section { min-width: 0; }
+.hovercard h5 { margin: 0 0 3px; font-size: var(--fs-xs); color: var(--ui-sub); font-weight: 600; }
+.hovercard .item { display: flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.6; }
+.hovercard .item::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--c); align-self: center; }
+.hovercard .id { flex: none; font-family: ui-monospace, monospace; color: var(--ui-sub); }
+.hovercard .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hovercard .st { flex: none; color: var(--c); }
+.hovercard .more { color: var(--ui-sub); padding-left: 12px; }
+
+/* ---- ダイアログ（タスク・決定記録・設定）: テーマによらず読みやすい面にする ---- */
+dialog { border: 1px solid var(--ui-line); border-radius: 8px; background: var(--ui-panel); color: var(--ui-ink); width: min(720px, 92vw); max-height: 84vh; padding: 20px 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; text-shadow: none; }
+dialog::backdrop { background: rgb(0 0 0 / 0.3); }
+dialog .close { float: right; }
+dialog .tag { font-size: var(--fs-xs); color: var(--ui-sub); border: 1px solid var(--ui-line); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+dialog .tag.high { color: var(--st-blocked); border-color: var(--st-blocked); }
+dialog .empty { color: var(--ui-sub); font-size: var(--fs-sm); }
+button.secondary { font: inherit; border-radius: var(--ui-radius); padding: 5px 12px; cursor: pointer; background: none; color: var(--ui-ink); border: 1px solid var(--ui-line); }
+
+.md { line-height: 1.7; overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0 0 10px; }
+.md ul, .md ol { margin: 0 0 10px; padding-left: 1.4em; }
+.md li > p { margin: 0; }
+.md li > ul, .md li > ol { margin: 2px 0 0; }
+.md h4, .md h5, .md h6 { margin: 20px 0 6px; font-size: var(--fs-base); }
+.md h4 { font-size: var(--fs-lg); }
+.md code { font-family: ui-monospace, monospace; font-size: 0.9em; background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 4px; padding: 0 4px; }
+.md pre { background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: var(--ui-radius); padding: 8px 10px; margin: 0 0 10px; overflow-x: auto; line-height: 1.5; }
+.md pre code { background: none; border: 0; padding: 0; }
+.md blockquote { margin: 0 0 10px; padding: 2px 12px; border-left: 3px solid var(--ui-line); color: var(--ui-sub); }
+.md hr { border: 0; border-top: 1px solid var(--ui-line); margin: 14px 0; }
+.md a { color: var(--st-doing); }
+
+#task { width: min(760px, 92vw); }
+.view-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.view-head .spacer { flex: 1; }
+.view-head .id { font-family: ui-monospace, monospace; font-size: var(--fs-sm); color: var(--ui-sub); }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); color: var(--c); border: 1px solid var(--c); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.view-title { font-size: var(--fs-2xl); line-height: 1.4; margin: 10px 0 16px; overflow-wrap: anywhere; }
+.props { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0 0 20px; font-size: var(--fs-md); }
+.props dt { color: var(--ui-sub); }
+.props dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; }
+.props dd.stack { display: grid; gap: 4px; }
+.task-link { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; line-height: 1.7; }
+.task-link > * + * { margin-left: 6px; }
+.task-link .name { text-decoration: underline; text-decoration-color: var(--ui-line); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.task-link:hover .name { text-decoration-color: currentColor; }
+.task-link .id, .props code { font-family: ui-monospace, monospace; font-size: var(--fs-sm); color: var(--ui-sub); }
+.view-section { border-top: 1px solid var(--ui-line); padding-top: 12px; margin-top: 16px; }
+.view-section h4 { font-size: var(--fs-sm); color: var(--ui-sub); font-weight: 600; margin: 0 0 8px; }
+.note { margin: 0 0 14px; }
+.note time { color: var(--ui-sub); font-size: var(--fs-sm); display: block; margin-bottom: 2px; }
+.note .by { font-size: var(--fs-xs); margin-left: 6px; }
+
+#settings { width: min(420px, 92vw); }
+#settings fieldset { border: 1px solid var(--ui-line); border-radius: var(--ui-radius); padding: 8px 12px 12px; margin: 0; display: grid; gap: 4px; }
+#settings fieldset + fieldset { margin-top: 12px; }
+#settings legend { font-size: var(--fs-sm); color: var(--ui-sub); padding: 0 4px; }
+#settings label { display: flex; align-items: center; gap: 8px; min-height: 30px; cursor: pointer; }
+#settings label small { color: var(--ui-sub); margin-left: auto; }
+.settings-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+/* ---- 動き。名前はテーマの CSS から使う ---- */
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes scroll { to { transform: translateX(-50%); } }
+@keyframes march { to { background-position: 11.3px 0; } }
+@keyframes slam { from { translate: -70px 0; opacity: 0; } }
+@keyframes sweep { 0%, 60% { left: -200px; } 100% { left: 120%; } }
+@keyframes band { 0% { translate: -120% 0; } 18%, 78% { translate: 0 0; } 100% { translate: 120% 0; } }
+@keyframes word { 0% { translate: 60vw 0; } 22%, 74% { translate: 0 0; } 100% { translate: -60vw 0; } }
+@keyframes flicker { 0% { opacity: 0; } 30% { opacity: .8; } 45% { opacity: .1; } 100% { opacity: 1; } }
+@keyframes term-cut { 0% { opacity: 0; } 3% { opacity: 1; } 5% { opacity: .2; } 8%, 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fade { from { opacity: 0; translate: 0 8px; } }
+@keyframes drop { 0% { opacity: 0; transform: translateY(-90px) rotate(-14deg); } 16%, 84% { opacity: 1; transform: rotate(-3deg); } 100% { opacity: 0; transform: translateY(40px) rotate(-3deg); } }
+@keyframes bob { 50% { translate: 0 -5px; } }
+@keyframes pop-up { from { opacity: 0; scale: .85; translate: 0 16px; } }
+@keyframes pop { 0% { scale: 0; } 12% { scale: 1.08; } 18%, 84% { scale: 1; } 100% { scale: 0; } }
+@keyframes confetti { 0% { opacity: 0; background-position: 0 -90px, 45px -45px, 20px -60px; } 8%, 88% { opacity: 1; } 100% { opacity: 0; background-position: 0 260px, 45px 330px, 20px 210px; } }
+@keyframes ink-in { from { opacity: 0; filter: blur(4px); } }
+@keyframes unroll { 0% { clip-path: inset(0 0 100% 0); } 22%, 86% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0); opacity: 0; } }
+@keyframes toast { 0% { opacity: 0; translate: 0 -8px; } 8%, 88% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+@keyframes spin { to { rotate: 360deg; } }
+@keyframes hue { to { filter: hue-rotate(360deg); } }
+@keyframes wave { 50% { translate: 0 -12px; rotate: 8deg; scale: 1.12; } }
+@keyframes pulse { 50% { scale: 1.15; } }
+@keyframes glitch { 0%, 90%, 100% { translate: 0 0; } 92% { translate: 4px 0; text-shadow: -4px 0 #ff3d8b, 4px 0 #20e3ff; } 94% { translate: -4px 0; text-shadow: 4px 0 #ff3d8b, -4px 0 #20e3ff; } 96% { translate: 2px -2px; } }
+@keyframes flow { to { background-position: 300% 0; } }
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -150% 0; } }
+@keyframes wobble { 50% { rotate: -6deg; scale: 1.1; } }
+@keyframes bounce { to { translate: 0 -6px; } }
+@keyframes stripe-move { to { background-position: 39.6px 0; } }
+@keyframes stars-a { to { background-position: 0 440px; } }
+@keyframes stars-b { to { background-position: 0 600px; } }
+@keyframes warp-in { from { opacity: 0; transform: perspective(800px) translateZ(-900px) rotateX(60deg); } }
+@keyframes float { 0%, 100% { translate: 0 0; rotate: -1deg; } 50% { translate: 0 -12px; rotate: 1deg; } }
+@keyframes swing { 0%, 100% { rotate: -3deg; } 50% { rotate: 3deg; } }
+@keyframes orbit { 0% { translate: 8px 0; } 25% { translate: 0 8px; } 50% { translate: -8px 0; } 75% { translate: 0 -8px; } 100% { translate: 8px 0; } }
+@keyframes flip { 0%, 70% { rotate: y 0deg; } 88%, 100% { rotate: y 360deg; } }
+@keyframes flash { 0% { opacity: 0; } 4%, 86% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes ring { from { scale: 0; opacity: 1; } to { scale: 8; opacity: 0; } }
+@keyframes zoom { 0% { scale: 6; opacity: 0; filter: blur(20px); } 15% { scale: 1; opacity: 1; filter: blur(0); } 80% { scale: 1.1; opacity: 1; } 100% { scale: .2; opacity: 0; rotate: 20deg; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

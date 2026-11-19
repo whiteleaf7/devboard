@@ -1,13 +1,20 @@
-/* ボードと活動の画面が共有する土台: 色・文字・ヘッダー・ボタン */
+/* 活動の画面の土台: 色・文字・ヘッダー・ボタン。ボードの画面は board.css とテーマ（themes/）を使う。暗い面は theme.js が付ける data-scheme で切り替える */
 :root {
   color-scheme: light;
   --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --sub: #6b6862; --line: #e3e0da;
   --todo: #8a8780; --doing: #2f6fb5; --review: #8a5cc2; --blocked: #c2453a; --done: #3d8a5a;
   --radius: 6px; --gap: 12px;
+  /* 文字の大きさの段。ベース（1rem）は設定の「文字の大きさ」で変わり、ほかの段もそれに比例する。
+     比は、ベース 14px のころの 9・11・12・13・15・18・20・22・28px に合わせてある */
+  --fs-2xs: 0.643rem; --fs-xs: 0.786rem; --fs-sm: 0.857rem; --fs-md: 0.929rem; --fs-base: 1rem;
+  --fs-lg: 1.071rem; --fs-xl: 1.286rem; --fs-2xl: 1.429rem; --fs-3xl: 1.571rem; --fs-4xl: 2rem;
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-  font-size: 14px; color: var(--ink); background: var(--bg);
+  font-size: 15px; color: var(--ink); background: var(--bg);
 }
-:root[data-theme="dark"] {
+:root[data-font-size="small"] { font-size: 14px; }
+:root[data-font-size="large"] { font-size: 16px; }
+:root[data-font-size="xlarge"] { font-size: 18px; }
+:root[data-scheme="dark"] {
   color-scheme: dark;
   --bg: #1b1a18; --panel: #252422; --ink: #ecebe8; --sub: #9c9890; --line: #3a3835;
   --error-bg: #3a2220; --error-ink: #f0b4ad;
@@ -15,9 +22,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 header { display: flex; align-items: center; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
-header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+header h1 { font-size: var(--fs-xl); margin: 0; letter-spacing: 0.02em; }
 header .spacer { flex: 1; }
-header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size: 12px; }
+header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size: var(--fs-sm); }
 .pages { display: flex; gap: 4px; }
 .pages a { color: var(--sub); text-decoration: none; padding: 4px 10px; border-radius: var(--radius); }
 .pages a:hover { background: var(--panel); }
@@ -27,11 +34,11 @@ header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size
 .live.on { background: var(--done); }
 main { padding: 16px 24px 48px; display: grid; gap: 24px; }
 main > * { min-width: 0; }
-h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 0 0 8px; }
-.errors { background: var(--error-bg, #fbeae8); color: var(--error-ink, #8a2a22); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; font-size: 12px; }
+h2 { font-size: var(--fs-md); color: var(--sub); font-weight: 600; margin: 0 0 8px; }
+.errors { background: var(--error-bg, #fbeae8); color: var(--error-ink, #8a2a22); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; font-size: var(--fs-sm); }
 .errors:empty { display: none; }
-.tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-weight: normal; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.empty { color: var(--sub); font-size: 12px; }
+.tag { font-size: var(--fs-xs); color: var(--sub); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-weight: normal; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.empty { color: var(--sub); font-size: var(--fs-sm); }
 button.primary, button.secondary { font: inherit; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; }
 button.primary { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
 button.secondary { background: none; color: var(--ink); border: 1px solid var(--line); }

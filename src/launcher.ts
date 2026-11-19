@@ -15,11 +15,23 @@ async function alive(url: string): Promise<boolean> {
   }
 }
 
+// 記録したサーバのプロセスが生きているか。落ちたあとに同じポートを別のプロジェクトのダッシュボードが使っていても、
+// そちらを開かないようにする
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 function recordedUrl(): string | null {
   const file = instanceFile();
   if (!existsSync(file)) return null;
   try {
-    return (JSON.parse(readFileSync(file, "utf8")) as { url: string }).url;
+    const { url, pid } = JSON.parse(readFileSync(file, "utf8")) as { url: string; pid: number };
+    return running(pid) ? url : null;
   } catch {
     return null;
   }
@@ -35,7 +47,8 @@ export async function ensureServer(): Promise<{ url: string; started: boolean }>
     cwd: repoRoot(),
     detached: true,
     stdio: ["ignore", log, log],
-    env: process.env,
+    // 裏で動くことを伝える。コードの更新で立て直すとき、端末に居座らずに入れ替わる（server.ts）
+    env: { ...process.env, DEVBOARD_BACKGROUND: "1" },
   });
   child.unref();
 

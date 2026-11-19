@@ -1,0 +1,160 @@
+/* テーマ: 朝刊。明朝体と罫線の紙面 */
+:root[data-theme="paper"] {
+  --paper: #f3efe4; --ink: #1c1b18; --sub: #5e594f; --rule: #1c1b18; --accent: #9e1b16;
+  --serif: "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --latin: Didot, "Bodoni 72", Georgia, serif;
+  --sans: "Hiragino Sans", sans-serif;
+  font-family: var(--serif); color: var(--ink); background: var(--paper);
+
+  .bg { background: var(--paper); }
+
+  /* 題字と日付の行 */
+  .top { flex-wrap: wrap; justify-content: center; gap: 8px 24px; padding: 26px 48px 8px; border-bottom: 4px double var(--rule); margin: 0 48px; padding-inline: 0; }
+  .logo { flex-basis: 100%; display: flex; justify-content: center; align-items: flex-end; font-family: var(--latin); font-size: 4.6rem;
+    font-weight: 700; letter-spacing: .04em; line-height: 1; border-bottom: 1px solid var(--rule); padding-bottom: 12px; }
+  .logo::after { content: "開発新報"; font-family: var(--serif); font-size: 1rem; font-weight: 700; writing-mode: vertical-rl;
+    margin-left: 16px; letter-spacing: .2em; border-left: 1px solid var(--rule); padding-left: 8px; }
+  .branch, .clock { font-family: var(--sans); font-size: .82rem; color: var(--sub); }
+  .branch::before { content: "ブランチ "; }
+  .branch em { font-style: normal; margin-left: 10px; color: var(--accent); }
+  .live { font-family: var(--sans); font-size: .78rem; letter-spacing: .2em; color: var(--accent); }
+  .live::before { content: "● "; animation: blink 2s steps(2) infinite; }
+  .clock::before { content: "発行 "; }
+  .clock small { margin-left: 8px; }
+
+  /* 数の帯: 縦の罫で区切る */
+  .stats { justify-content: center; padding: 14px 48px 0; }
+  .stat { display: flex; align-items: baseline; gap: 8px; padding: 2px 26px; border-left: 1px solid var(--rule); }
+  .stat:first-child { border-left: 0; }
+  .stat b { font-family: var(--latin); font-size: 2.1rem; }
+  .stat span { font-size: .88rem; font-weight: 700; }
+  .stat.hot b { color: var(--accent); }
+  .stat.dim { color: var(--sub); }
+
+  /* 段組み: 右の段は縦の罫で分ける */
+  main { gap: 40px 0; padding-top: 28px; }
+  .col-side { border-left: 1px solid var(--rule); padding-left: 32px; }
+  .col-main { padding-right: 32px; }
+  main > .span { border-top: 1px solid var(--rule); padding-top: 22px; }
+
+  /* 見出し: 和文を大きく、欧文は添える */
+  .h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 16px; border-bottom: 2px solid var(--rule); padding-bottom: 6px; }
+  .h small { order: 1; font-size: 1.45rem; font-weight: 700; }
+  .h b { order: 2; font-family: var(--latin); font-style: italic; font-size: .95rem; font-weight: 400; letter-spacing: .15em; color: var(--sub); }
+  .h .n { order: 3; font-family: var(--sans); font-size: .9rem; color: var(--sub); }
+
+  /* 進行中: 1 件目をトップ記事にする */
+  .now-list { gap: 22px; }
+  .op + .op { border-top: 1px solid var(--rule); padding-top: 20px; }
+  .op .bigid { display: none; }
+  .op .stamp { font-family: var(--sans); font-size: .78rem; border: 1px solid var(--ink); padding: 1px 6px; margin-right: 8px; }
+  .op h3 { font-size: 2.3rem; line-height: 1.3; font-weight: 700; margin: 10px 0 12px; }
+  .op:nth-child(n+2) h3 { font-size: 1.6rem; }
+  .op .crumb { display: block; font-size: .95rem; color: var(--accent); margin-bottom: 4px; }
+  .bubble { font-size: 1.05rem; line-height: 1.9; }
+  .bubble::before { content: "【経過】"; font-weight: 700; }
+  .op .foot { display: flex; gap: 14px; margin-top: 8px; font-family: var(--sans); font-size: .8rem; color: var(--sub); }
+  .op .foot time { margin-left: auto; }
+  .op:hover h3 { text-decoration: underline 1px; text-underline-offset: 6px; }
+  .chip { font-family: var(--sans); font-size: .75rem; color: var(--sub); }
+  .chip + .chip::before { content: "・"; }
+  .chip.solid { color: var(--accent); font-weight: 700; }
+  .kids i { width: 8px; height: 8px; border: 1px solid var(--ink); border-radius: 50%; }
+  .kids i.on { background: var(--ink); }
+
+  /* マイルストーン: 表のような行 */
+  .ms { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .ms.done { color: var(--sub); }
+  .ms .row1 { display: flex; align-items: baseline; gap: 10px; }
+  .ms .mid { font-family: var(--latin); font-size: 1.3rem; }
+  .ms .title { font-weight: 700; font-size: 1.05rem; }
+  .ms .state { font-family: var(--sans); font-size: .72rem; border: 1px solid; padding: 0 6px; }
+  .ms.active .state { color: var(--accent); }
+  .ms .pct { margin-left: auto; font-family: var(--latin); font-size: 1.8rem; }
+  .ms .goal { font-size: .85rem; color: var(--sub); margin: 2px 0 8px; }
+  .segs { gap: 3px; }
+  .segs i { flex: 1; height: 6px; background: #d9d3c4; }
+  .segs i.done { background: var(--ink); }
+  .segs i.doing { background: var(--accent); }
+  .ms.done .segs i.done { background: var(--sub); }
+
+  /* 確認待ち・止まっている: 囲みのお知らせ */
+  .check { border: 1px solid var(--rule); padding: 16px 18px; }
+  .hazard { border: 3px double var(--accent); padding: 16px 18px; }
+  .check .label, .hazard .label { display: inline-block; font-size: .9rem; font-weight: 700; letter-spacing: .1em; border-bottom: 1px solid; padding-bottom: 2px; color: var(--sub); }
+  .hazard .label { color: var(--accent); }
+  .check .label::before { content: "確認のお願い"; }
+  .hazard .label::before { content: "停止のお知らせ"; }
+  .check .seal { position: absolute; right: 16px; top: 14px; width: 66px; height: 66px; border-radius: 50%; border: 3px solid var(--accent);
+    color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: .88rem; rotate: -12deg; }
+  .check .seal::before { content: "要確認"; }
+  .card-id { font-family: var(--sans); font-size: .8rem; color: var(--sub); margin-top: 10px; }
+  .card-title { font-size: 1.25rem; font-weight: 700; line-height: 1.45; margin: 4px 70px 8px 0; }
+  .reason { font-size: .95rem; line-height: 1.8; margin-bottom: 8px; }
+
+  /* 次にやる順 */
+  .queue li { grid-template-columns: 44px 1fr auto; padding: 10px 0; border-bottom: 1px dotted var(--sub); }
+  .queue .num { font-family: var(--latin); font-size: 1.8rem; }
+  .queue .plate .t { display: block; font-weight: 700; font-size: 1.05rem; }
+  .queue .plate .m { font-family: var(--sans); font-size: .75rem; color: var(--sub); }
+  .queue li.first .num { color: var(--accent); }
+  .queue li.first .t { font-size: 1.25rem; }
+  .queue li.first .t::before { content: "次"; font-size: .8rem; color: #fff; background: var(--accent); padding: 1px 5px; margin-right: 8px; vertical-align: middle; }
+  .burst:not(:empty) { font-family: var(--sans); font-size: .72rem; color: #fff; background: var(--accent); padding: 2px 6px; }
+  .queue li.low { color: var(--sub); }
+
+  /* 終わったもの: 小さな記事と判子 */
+  .cleared { gap: 0 28px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .tile { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid #cfc8b8; }
+  .tile .card-id { font-family: var(--sans); font-size: .72rem; color: var(--sub); margin: 0; }
+  .tile .tt { font-size: .95rem; line-height: 1.5; }
+  .tile time { font-family: var(--sans); font-size: .72rem; color: var(--sub); }
+  .tile .seal { grid-column: 2; grid-row: 1 / span 3; align-self: center; width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid var(--accent); color: var(--accent); display: grid; place-items: center; font-weight: 700; rotate: -10deg; }
+  .tile.done .seal::before { content: "済"; font-size: 1.2rem; }
+  .tile.cancelled .seal { border-color: var(--sub); color: var(--sub); font-size: .7rem; }
+  .tile.cancelled .seal::before { content: "中止"; }
+  .tile.cancelled .tt { text-decoration: line-through; color: var(--sub); }
+
+  /* 決定記録: 社告 */
+  .file { border-top: 3px solid var(--rule); padding-top: 10px; }
+  .file .no { font-family: var(--latin); font-size: .9rem; color: var(--sub); }
+  .file .ft { font-size: 1.15rem; font-weight: 700; line-height: 1.5; margin: 6px 0 10px; }
+  .file .fm { display: flex; justify-content: space-between; font-family: var(--sans); font-size: .78rem; color: var(--sub); }
+  .file .chip.solid { color: var(--accent); }
+  .file:hover .ft { text-decoration: underline 1px; text-underline-offset: 5px; }
+
+  /* コミット: 速報 */
+  .ticker { background: var(--paper); border-top: 4px double var(--rule); color: var(--ink); }
+  .ticker .tag { background: var(--accent); color: #fff; font-size: 0; }
+  .ticker .tag::before { content: "速報"; font-size: 1rem; font-weight: 700; letter-spacing: .2em; }
+  .ticker .track span { font-size: .9rem; }
+  .ticker .track span b { font-family: var(--sans); color: var(--sub); margin-right: 10px; font-size: .8rem; }
+  .ticker .track span::after { content: "◇"; color: var(--sub); padding-left: 30px; }
+
+  .rise { animation: fade .6s ease both; animation-delay: calc(var(--d, 0) * 60ms); }
+
+  /* 終わったときの演出: 号外が落ちてくる */
+  .cutin { background: rgba(28, 27, 24, .3); }
+  .cutin .band { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 560px; padding: 28px 32px; display: flex; gap: 24px; align-items: center;
+    background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 30px 60px rgba(0, 0, 0, .35); animation: drop 2.4s cubic-bezier(.2, .9, .3, 1) both; }
+  .cutin .word { writing-mode: vertical-rl; font-size: 5.2rem; font-weight: 800; color: #fff; background: var(--accent); padding: 14px 8px; line-height: 1; }
+  .cutin .word::before { content: "号外"; }
+  .cutin .what { font-size: 1.9rem; font-weight: 700; line-height: 1.35; }
+  .cutin .what b { display: block; font-family: var(--sans); font-size: .85rem; font-weight: 400; color: var(--sub); margin-bottom: 8px; }
+  .cutin .what::after { content: "完了す"; display: block; color: var(--accent); font-size: 1.1rem; margin-top: 10px; }
+
+  /* ダイアログ: 紙面の切り抜き。二重の罫で囲み、見出しは明朝で大きく */
+  --ui-bg: #ebe5d6; --ui-panel: #f6f2e8; --ui-ink: #1c1b18; --ui-sub: #5e594f; --ui-line: #cfc8b8; --ui-radius: 0;
+  --st-todo: #5e594f; --st-doing: #1c1b18; --st-review: #5e594f; --st-blocked: #9e1b16; --st-done: #1c1b18;
+  dialog { font-family: var(--serif); border: 4px double var(--rule); border-radius: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, .28); accent-color: var(--accent); }
+  dialog[open] { animation: fade .35s ease both; }
+  dialog::backdrop { background: rgba(28, 27, 24, .4); }
+  dialog h3 { font-weight: 700; border-bottom: 2px solid var(--rule); padding-bottom: 8px; }
+  dialog .view-title { font-size: 1.9rem; line-height: 1.35; }
+  dialog .view-section { border-top: 1px solid var(--rule); }
+  dialog .view-section h4, #settings legend { font-size: 1rem; font-weight: 700; color: var(--ink); }
+  dialog .md { line-height: 1.9; }
+  dialog .props dt, dialog .view-head .id, dialog .tag, dialog .note time, dialog button.secondary { font-family: var(--sans); }
+  dialog button.secondary { border-radius: 0; border-color: var(--rule); }
+}

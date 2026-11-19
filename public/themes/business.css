@@ -1,0 +1,151 @@
+/* テーマ: 業務。見やすさを最優先にした落ち着いた画面。状態は色だけでなく言葉でも出し、動きはほぼ無くす */
+:root[data-theme="business"] {
+  --bg: #f6f7f9; --panel: #fff; --ink: #1f2328; --sub: #59636e; --line: #d8dee4; --line-2: #eaeef2;
+  --blue: #0969da; --blue-bg: #ddf4ff; --purple: #8250df; --purple-bg: #fbefff; --red: #cf222e; --red-bg: #ffebe9;
+  --green: #1a7f37; --green-bg: #dafbe1; --amber: #9a6700;
+  --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--sans); color: var(--ink); background: var(--bg); font-variant-numeric: tabular-nums;
+
+  .bg { background: var(--bg); }
+
+  /* ヘッダー */
+  .top { padding: 12px 32px; gap: 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .logo { font-weight: 700; font-size: 1.1rem; letter-spacing: .04em; }
+  .branch { font-family: var(--mono); font-size: .85rem; color: var(--sub); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; }
+  .branch em { font-style: normal; font-family: var(--sans); color: var(--amber); margin-left: 8px; }
+  .live { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--green); }
+  .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .clock { font-size: .9rem; color: var(--sub); }
+  .clock small { margin-left: 6px; }
+
+  /* 数: 見出しを上、数を下 */
+  .stats { gap: 12px; padding: 20px 32px 0; }
+  .stat { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 150px; padding: 10px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .stat b { font-size: 1.6rem; font-weight: 600; }
+  .stat span { font-size: .8rem; color: var(--sub); }
+  .stat.hot b { color: var(--blue); }
+  .stat.warn b { color: var(--red); }
+  .stat.dim b { color: var(--green); }
+
+  /* 区画: 白いパネル */
+  main { gap: 20px; padding: 20px 32px 110px; }
+  main section, main aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  .h { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+  .h b { display: none; }
+  .h small { font-size: 1rem; font-weight: 600; }
+  .h .n { font-size: .78rem; color: var(--sub); background: var(--line-2); border-radius: 999px; padding: 0 8px; }
+
+  /* 進行中 */
+  .now-list { gap: 12px; }
+  .op .face { border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 6px; padding: 12px 16px; }
+  .op:hover .face { border-color: #afb8c1; border-left-color: var(--blue); }
+  .op .bigid { display: none; }
+  .op .stamp { font-family: var(--mono); font-size: .8rem; color: var(--sub); margin-right: 8px; }
+  .op h3 { font-size: 1.1rem; font-weight: 600; margin: 6px 0; line-height: 1.5; }
+  .op .crumb { display: block; font-size: .8rem; color: var(--sub); font-weight: 400; }
+  .bubble { font-size: .9rem; background: var(--bg); border-radius: 6px; padding: 8px 10px; line-height: 1.6; }
+  .bubble::before { content: "最新のメモ: "; color: var(--sub); }
+  .op .foot { display: flex; gap: 12px; margin-top: 8px; font-size: .8rem; color: var(--sub); }
+  .op .foot .br { font-family: var(--mono); }
+  .op .foot time { margin-left: auto; }
+  .chip { font-size: .75rem; padding: 1px 8px; border-radius: 999px; background: var(--line-2); color: var(--sub); }
+  .chip.solid { background: var(--red-bg); color: var(--red); }
+  .kids { gap: 2px; }
+  .kids i { width: 8px; height: 8px; border-radius: 2px; background: var(--line); }
+  .kids i.on { background: var(--green); }
+
+  /* マイルストーン */
+  .ms-list { gap: 0; }
+  .ms { padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+  .ms:last-child { border-bottom: 0; }
+  .ms .row1 { display: flex; align-items: baseline; gap: 8px; }
+  .ms .mid { font-family: var(--mono); font-size: .85rem; color: var(--sub); }
+  .ms .title { font-weight: 600; }
+  .ms .state { font-size: .72rem; border-radius: 999px; padding: 0 8px; background: var(--line-2); color: var(--sub); }
+  .ms.active .state { background: var(--blue-bg); color: var(--blue); }
+  .ms.done .state { background: var(--green-bg); color: var(--green); }
+  .ms .pct { margin-left: auto; font-weight: 600; }
+  .ms .pct small { font-size: .8rem; color: var(--sub); }
+  .ms .goal { font-size: .8rem; color: var(--sub); margin: 2px 0 8px; }
+  .segs { gap: 2px; }
+  .segs i { flex: 1; height: 6px; background: var(--line-2); border-radius: 2px; }
+  .segs i.done { background: var(--green); }
+  .segs i.doing { background: var(--blue); }
+
+  /* 確認待ち・止まっている */
+  .alert-list { gap: 12px; }
+  .check, .hazard { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .check { border-left: 3px solid var(--purple); }
+  .hazard { border-left: 3px solid var(--red); }
+  .check .label, .hazard .label { display: inline-block; font-size: .75rem; font-weight: 600; border-radius: 999px; padding: 1px 8px; }
+  .check .label { background: var(--purple-bg); color: var(--purple); }
+  .hazard .label { background: var(--red-bg); color: var(--red); }
+  .check .label::before { content: "レビュー待ち"; }
+  .hazard .label::before { content: "ブロック中"; }
+  .check .seal { display: none; }
+  .card-id { font-family: var(--mono); font-size: .8rem; color: var(--sub); margin-top: 8px; }
+  .card-title { font-weight: 600; font-size: 1rem; line-height: 1.5; margin: 2px 0 6px; }
+  .reason { font-size: .85rem; margin-bottom: 8px; line-height: 1.6; }
+  .hazard .reason::before { content: "理由: "; color: var(--sub); }
+
+  /* 次にやる順: 表の行 */
+  .queue li { grid-template-columns: 32px 1fr auto; padding: 8px 4px; border-bottom: 1px solid var(--line-2); }
+  .queue li:last-child { border-bottom: 0; }
+  .queue li:hover { background: var(--bg); }
+  .queue .num { font-size: .85rem; color: var(--sub); text-align: right; padding-right: 10px; }
+  .queue .plate .t { display: block; font-weight: 500; }
+  .queue .plate .m { font-family: var(--mono); font-size: .75rem; color: var(--sub); }
+  .queue li.first .t::after { content: "次"; margin-left: 8px; font-size: .7rem; background: var(--blue-bg); color: var(--blue); border-radius: 999px; padding: 0 8px; vertical-align: 2px; }
+  .burst:not(:empty) { font-size: .72rem; color: var(--red); background: var(--red-bg); border-radius: 999px; padding: 1px 8px; }
+  .queue li.low { color: var(--sub); }
+
+  /* 終わったもの: 一覧の行 */
+  .cleared { gap: 0 24px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+  .tile { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-2); font-size: .88rem; }
+  .tile .card-id { font-family: var(--mono); font-size: .78rem; color: var(--sub); margin: 0; }
+  .tile time { font-size: .78rem; color: var(--sub); }
+  .tile .seal { font-size: .72rem; border-radius: 999px; padding: 1px 8px; }
+  .tile.done .seal { background: var(--green-bg); color: var(--green); }
+  .tile.done .seal::before { content: "完了"; }
+  .tile.cancelled .seal { background: var(--line-2); color: var(--sub); }
+  .tile.cancelled .seal::before { content: "中止"; }
+  .tile.cancelled .tt { text-decoration: line-through; color: var(--sub); }
+
+  /* 決定記録 */
+  .files { gap: 12px; }
+  .file { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .file:hover { border-color: #afb8c1; }
+  .file .no { font-family: var(--mono); font-size: .78rem; color: var(--sub); }
+  .file .ft { font-weight: 600; margin: 4px 0 8px; line-height: 1.5; }
+  .file .fm { display: flex; justify-content: space-between; align-items: center; font-size: .78rem; color: var(--sub); }
+  .file .chip.solid { background: var(--green-bg); color: var(--green); }
+
+  /* コミット: 流さずに並べる */
+  .ticker { height: 40px; background: var(--panel); border-top: 1px solid var(--line); }
+  .ticker .tag { font-size: .8rem; font-weight: 600; color: var(--sub); background: var(--bg); border-right: 1px solid var(--line); }
+  .ticker .track { animation: none; }
+  .ticker .track span.dup { display: none; }
+  .ticker .track span { font-size: .85rem; border-right: 1px solid var(--line); }
+  .ticker .track span b { font-family: var(--mono); color: var(--blue); margin-right: 8px; font-weight: 400; }
+
+  .rise { animation: none; }
+
+  /* 終わったときの演出: 右上の通知だけ */
+  .cutin { inset: 70px 24px auto auto; }
+  .cutin .band { display: flex; flex-direction: column; gap: 4px; min-width: 340px; padding: 12px 16px; background: var(--panel);
+    border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    animation: toast 2.4s ease both; }
+  .cutin .word { font-weight: 600; color: var(--green); }
+  .cutin .word::before { content: "完了しました"; }
+  .cutin .what { font-size: .9rem; }
+  .cutin .what b { font-family: var(--mono); color: var(--sub); margin-right: 8px; font-weight: 400; }
+
+  /* ダイアログ: 白い面に細い枠、影は柔らかく */
+  --ui-bg: #f6f7f9; --ui-panel: #fff; --ui-ink: #1f2328; --ui-sub: #59636e; --ui-line: #d8dee4; --ui-radius: 6px;
+  --st-todo: #6e7781; --st-doing: #0969da; --st-review: #8250df; --st-blocked: #cf222e; --st-done: #1a7f37;
+  dialog { font-family: var(--sans); border-radius: 12px; box-shadow: 0 16px 48px rgba(31, 35, 40, .18); accent-color: var(--blue); }
+  dialog::backdrop { background: rgba(31, 35, 40, .35); }
+  dialog h3 { font-weight: 600; }
+  dialog button.secondary { border-radius: 6px; }
+}

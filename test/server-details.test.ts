@@ -151,3 +151,20 @@ test("起動中の URL と PID を記録し、閉じたら消す", async () => {
   second.close();
   assert.ok(!existsSync(instanceFile()));
 });
+
+test("ポートを指定されていなければ、使われている番号を飛ばして次の番号で待ち受け、実際の URL を記録する", async () => {
+  // ほかのプロジェクトのダッシュボードが先に使っている番号の代わり
+  const { createServer } = await import("node:http");
+  const taken = createServer();
+  await new Promise<void>((r) => taken.listen(0, "127.0.0.1", r));
+  const port = (taken.address() as AddressInfo).port;
+
+  const s = startServer(port, [], true);
+  await new Promise((r) => s.server.once("listening", r));
+  const actual = (s.server.address() as AddressInfo).port;
+  assert.ok(actual > port, `${actual} は ${port} より後ろの番号`);
+  assert.equal(JSON.parse(readFileSync(instanceFile(), "utf8")).url, `http://127.0.0.1:${actual}/`);
+  assert.equal((await fetch(`http://127.0.0.1:${actual}/api/snapshot`)).status, 200);
+  s.close();
+  taken.close();
+});

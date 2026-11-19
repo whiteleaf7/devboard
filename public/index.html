@@ -3,166 +3,104 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f5f2">
+<meta name="theme-color" content="#f6f7f9">
 <script src="/theme.js"></script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>devboard</title>
-<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/board.css">
+<!-- テーマはどれも :root[data-theme="<id>"] の下に閉じているので、全部読んでおき、theme.js が選んだものだけが効く -->
+<link rel="stylesheet" href="/themes/business.css">
+<link rel="stylesheet" href="/themes/poster.css">
+<link rel="stylesheet" href="/themes/poster-light.css">
+<link rel="stylesheet" href="/themes/terminal.css">
+<link rel="stylesheet" href="/themes/paper.css">
+<link rel="stylesheet" href="/themes/pop.css">
+<link rel="stylesheet" href="/themes/tategaki.css">
+<link rel="stylesheet" href="/themes/motion.css">
 <style>
-  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .section-head h2 { margin: 0; }
-  .section-head button.secondary { font-size: 12px; padding: 2px 8px; color: var(--sub); }
-  .milestones { display: flex; gap: var(--gap); flex-wrap: wrap; }
-  .ms { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; min-width: 200px; max-width: 320px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
-  .ms[aria-pressed="true"] { outline: 2px solid var(--doing); outline-offset: -1px; }
-  .ms .head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
-  .ms .goal { color: var(--sub); font-size: 12px; margin-top: 4px; }
-  .ms .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-  .ms .bar i { display: block; height: 100%; background: var(--done); }
-  .tag.active { color: var(--doing); border-color: var(--doing); }
-  .tag.done { color: var(--done); border-color: var(--done); }
-
-  .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
-  .card .title { overflow-wrap: anywhere; }
-  .col h3 { font-size: 12px; margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
-  .col h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
-  .col h3 .n { color: var(--sub); font-weight: normal; }
-  .cards { display: grid; gap: 8px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: var(--radius); padding: 8px 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
-  .card .id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--sub); }
-  .card .title { margin: 2px 0 4px; }
-  .card .meta { display: flex; gap: 4px; flex-wrap: wrap; }
-  .card.cancelled { opacity: 0.55; }
-  .card.cancelled .title { text-decoration: line-through; }
-  .tag.high { color: var(--blocked); border-color: var(--blocked); }
-  .tag.wait { color: var(--review); border-color: var(--review); }
-
-  .decisions { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
-  .decisions button { display: flex; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-  .decisions button:first-child { border-top: 0; }
-  .decisions .num { font-family: ui-monospace, monospace; color: var(--sub); }
-  .decisions .title { flex: 1; }
-  .decisions .date { color: var(--sub); font-size: 12px; }
-
-  .pager { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
-  .pager button { font-size: 12px; color: var(--sub); white-space: nowrap; }
-
-  .commits { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
-
-  dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); width: min(720px, 92vw); max-height: 84vh; padding: 20px 24px; }
-  dialog::backdrop { background: rgb(0 0 0 / 0.3); }
-  dialog .close { float: right; }
-
-  .md { line-height: 1.7; overflow-wrap: anywhere; }
-  .md > :first-child { margin-top: 0; }
-  .md > :last-child { margin-bottom: 0; }
-  .md p { margin: 0 0 10px; }
-  .md ul, .md ol { margin: 0 0 10px; padding-left: 1.4em; }
-  .md li > p { margin: 0; }
-  .md li > ul, .md li > ol { margin: 2px 0 0; }
-  .md h4, .md h5, .md h6 { margin: 20px 0 6px; font-size: 14px; }
-  .md h4 { font-size: 15px; }
-  .md code { font-family: ui-monospace, monospace; font-size: 0.9em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-  .md pre { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; margin: 0 0 10px; overflow-x: auto; line-height: 1.5; }
-  .md pre code { background: none; border: 0; padding: 0; }
-  .md blockquote { margin: 0 0 10px; padding: 2px 12px; border-left: 3px solid var(--line); color: var(--sub); }
-  .md hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
-  .md a { color: var(--doing); }
-
-  #task { width: min(760px, 92vw); }
-  .view-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .view-head .spacer { flex: 1; }
-  .view-head .id { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); }
-  .status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--c); border: 1px solid var(--c); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
-  .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
-  .view-title { font-size: 20px; line-height: 1.4; margin: 10px 0 16px; overflow-wrap: anywhere; }
-  .props { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0 0 20px; font-size: 13px; }
-  .props dt { color: var(--sub); }
-  .props dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; }
-  .props dd.stack { display: grid; gap: 4px; }
-  .task-link { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; line-height: 1.7; }
-  .task-link > * + * { margin-left: 6px; }
-  .task-link .name { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; overflow-wrap: anywhere; }
-  .task-link:hover .name { text-decoration-color: currentColor; }
-  .task-link .id, .props code { font-family: ui-monospace, monospace; font-size: 12px; color: var(--sub); }
-  .view-section { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 16px; }
-  .view-section h4 { font-size: 12px; color: var(--sub); font-weight: 600; margin: 0 0 8px; }
-  .note { margin: 0 0 14px; }
-  .note time { color: var(--sub); font-size: 12px; display: block; margin-bottom: 2px; }
-
-  .note .by { font-size: 11px; margin-left: 6px; }
-
-  .status-tabs { display: none; }
-
-  #settings { width: min(360px, 92vw); }
-  #settings fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 12px; margin: 0; display: grid; gap: 8px; }
-  #settings legend { font-size: 12px; color: var(--sub); padding: 0 4px; }
-  #settings label { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
-  .settings-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
-
-  /* スマホ: 1 列ずつタブで切り替え、ダイアログは画面いっぱいにする */
+  /* 幅が狭いときの並べ方。テーマの指定より後に置いて、どのテーマでも 1 段にする（縦書きは横に流れるので除く） */
+  /* 左の列の終わったものは、縦に 1 件ずつ並べる（縦書きは横に流れるので除く） */
+  :root:not([data-theme="tategaki"]) .col .cleared { grid-template-columns: minmax(0, 1fr); }
+  :root:not([data-theme="tategaki"]) .col .tile { min-height: 0; }
+  @media (max-width: 1100px) {
+    :root:not([data-theme="tategaki"]) main { grid-template-columns: minmax(0, 1fr); }
+    :root:not([data-theme="tategaki"]) .alert-list { grid-template-columns: minmax(0, 1fr); }
+    /* 1 列のときは左右の列の箱をほどき、見たい順（進行中・次にやる順・確認待ち・マイルストーン・終わったもの）にする */
+    .col { display: contents; }
+    .col-main > :nth-child(1) { order: 1; }
+    .col-side > :nth-child(1) { order: 2; }
+    .col-main > :nth-child(2) { order: 3; }
+    .col-side > :nth-child(2) { order: 4; }
+    .col-main > :nth-child(3) { order: 5; }
+    main > .span { order: 6; }
+  }
   @media (max-width: 760px) {
-    .milestones { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
-    .milestones::-webkit-scrollbar { display: none; }
-    .ms { flex: 0 0 78%; max-width: none; scroll-snap-align: start; }
-
-    .status-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
-    .status-tabs button { font: inherit; font-size: 11px; line-height: 1.3; color: var(--sub); background: var(--panel); border: 1px solid var(--line); border-bottom: 3px solid var(--line); border-radius: var(--radius); padding: 6px 2px 4px; min-height: 48px; display: grid; justify-items: center; align-content: center; gap: 2px; white-space: nowrap; }
-    .status-tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--line); border-bottom-color: var(--c); font-weight: 600; }
-    .status-tabs .n { font-size: 15px; font-weight: 600; color: var(--ink); }
-
-    .board { grid-template-columns: minmax(0, 1fr); }
-    .col { display: none; }
-    .col.current { display: block; }
-    .col h3 { display: none; }
-    .card { padding: 10px 12px; }
-    .card .title { font-size: 15px; }
-
-    .decisions button { flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; }
-    .decisions .title { flex-basis: calc(100% - 60px); }
-    .decisions .tag { margin-left: 46px; }
-    .commits li { overflow-wrap: anywhere; }
-
+    :root:not([data-theme="tategaki"]) main { padding: 20px 16px 110px; gap: 36px; }
+    :root:not([data-theme="tategaki"]) .top { flex-wrap: wrap; gap: 10px 16px; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
+    :root:not([data-theme="tategaki"]) .stats { padding-left: 16px; padding-right: 16px; }
+    :root:not([data-theme="tategaki"]) .errors { margin: 12px 16px 0; }
+    /* 一覧の列の最小幅や、斜めの札が、狭い画面の幅を超えないようにする */
+    :root:not([data-theme="tategaki"]) .cleared, :root:not([data-theme="tategaki"]) .files { grid-template-columns: minmax(0, 1fr); }
+    :root:not([data-theme="tategaki"]) .queue { padding-right: 10px; }
     dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 12px 12px 0 0; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     #task, #settings { width: 100vw; }
     .view-head button { min-height: 40px; }
-    .view-title { font-size: 18px; }
+    .view-title { font-size: var(--fs-xl); }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="name">devboard</h1>
-  <nav class="pages" aria-label="画面"><a href="/" aria-current="page">ボード</a><a href="/activity">活動</a></nav>
-  <span class="spacer"></span>
-  <span class="git" id="git"></span>
-  <button type="button" class="secondary" id="open-settings">設定</button>
-  <span class="live" id="live" title="変更を監視中"></span>
-</header>
-<main>
+<div class="bg"><i></i></div>
+<div class="page" id="page">
+  <header class="top">
+    <h1 class="logo" id="logo">devboard</h1>
+    <nav class="pages" aria-label="画面"><a href="/" aria-current="page">ボード</a><a href="/activity">活動</a></nav>
+    <div class="branch" id="branch"></div>
+    <span class="spacer"></span>
+    <div class="live" id="live" title="変更を監視中">LIVE</div>
+    <div class="clock" id="clock"></div>
+    <button type="button" class="top-button" id="open-settings">設定</button>
+  </header>
   <div class="errors" id="errors"></div>
-  <section>
-    <div class="section-head">
-      <h2>マイルストーン</h2>
-      <button type="button" class="secondary" id="toggle-done-milestones" aria-pressed="false" hidden></button>
+  <div class="stats" id="stats"></div>
+  <main>
+    <!-- 左右の列は別々に上から詰める。片方が長くても、もう片方の下に隙間を作らない -->
+    <div class="col col-main">
+      <section>
+        <h2 class="h red"><b>NOW</b><small>進行中</small></h2>
+        <div class="now-list" id="now"></div>
+      </section>
+      <section>
+        <h2 class="h red"><b>ALERT</b><small>確認待ち・止まっている</small></h2>
+        <div class="alert-list" id="alerts"></div>
+      </section>
+      <section>
+        <h2 class="h"><b>CLEARED</b><small>終わったもの</small><span class="n" id="cleared-n"></span></h2>
+        <div class="cleared" id="cleared"></div>
+        <div id="cleared-pager"></div>
+      </section>
     </div>
-    <div class="milestones" id="milestones"></div>
-  </section>
-  <section>
-    <h2 id="board-title">タスク</h2>
-    <div class="status-tabs" id="status-tabs" role="tablist" aria-label="表示する状態"></div>
-    <div class="board" id="board"></div>
-  </section>
-  <section>
-    <h2>決定記録</h2>
-    <div class="decisions" id="decisions"></div>
-    <div id="decisions-pager"></div>
-  </section>
-  <section>
-    <h2>最近のコミット</h2>
-    <ul class="commits" id="commits"></ul>
-  </section>
-</main>
+    <div class="col col-side">
+      <aside>
+        <h2 class="h"><b>NEXT</b><small>次にやる順</small></h2>
+        <ol class="queue" id="queue"></ol>
+        <div id="queue-pager"></div>
+      </aside>
+      <aside>
+        <h2 class="h"><b>MILESTONE</b><small>マイルストーン</small></h2>
+        <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
+      </aside>
+    </div>
+    <section class="span">
+      <h2 class="h red"><b>DECISION</b><small>決定記録</small></h2>
+      <div class="files" id="files"></div>
+      <div id="files-pager"></div>
+    </section>
+  </main>
+</div>
+<footer class="ticker"><div class="tag">COMMIT</div><div class="track" id="ticker"></div></footer>
+<div class="cutin" id="cutin" aria-live="polite"><div class="band"><span class="word"></span><span class="what" id="cutin-what"></span></div></div>
+
 <dialog id="detail" aria-labelledby="detail-title">
   <form method="dialog" class="close"><button class="secondary" autofocus>閉じる</button></form>
   <h3 id="detail-title"></h3>
@@ -171,10 +109,15 @@
 <dialog id="settings" aria-labelledby="settings-title">
   <form method="dialog" class="settings">
     <h3 id="settings-title" style="margin: 0 0 12px">設定</h3>
-    <fieldset>
+    <fieldset id="theme-options">
       <legend>テーマ</legend>
-      <label><input type="radio" name="theme" value="light"> ライト</label>
-      <label><input type="radio" name="theme" value="dark"> ダーク</label>
+    </fieldset>
+    <fieldset>
+      <legend>文字の大きさ</legend>
+      <label><input type="radio" name="font-size" value="small"> 小さい</label>
+      <label><input type="radio" name="font-size" value="normal"> 標準</label>
+      <label><input type="radio" name="font-size" value="large"> 大きい</label>
+      <label><input type="radio" name="font-size" value="xlarge"> とても大きい</label>
     </fieldset>
     <div class="settings-actions"><button class="secondary">閉じる</button></div>
   </form>
@@ -204,25 +147,19 @@
 import { parseMarkdown } from "./markdown.js";
 import { nextLimit, page } from "./paging.js";
 
-const COLUMNS = [
-  ["todo", "未着手"], ["doing", "作業中"], ["review", "確認待ち"], ["blocked", "ブロック"], ["done", "完了・中止"],
-];
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
-const LIST_SIZE = { column: { first: 8, step: 20 }, decisions: { first: 5, step: 20 } };
-document.getElementById("open-settings").onclick = () => {
-  for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
-  document.getElementById("settings").showModal();
-};
-for (const r of document.querySelectorAll('#settings input[name="theme"]')) {
-  r.onchange = () => { localStorage.setItem(THEME_KEY, r.value); applyTheme(r.value); };
-}
-
-let data = null;
-let filter = null; // 選択中のマイルストーン ID
-const SHOW_DONE_MILESTONES_KEY = "devboard-show-done-milestones";
-let showDoneMilestones = localStorage.getItem(SHOW_DONE_MILESTONES_KEY) === "true";
-let mobileStatus = "todo"; // スマホで表示している列
-const limits = new Map(); // 一覧（列の状態か "decisions"）ごとに開いた件数。変更の通知で描き直しても保つ
+const LIST_SIZE = { queue: { first: 8, step: 20 }, cleared: { first: 10, step: 30 }, files: { first: 8, step: 20 } };
+const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+const FINISHED = ["done", "cancelled"];
+// カードに出す最新メモの長さ。全文はタスクを開けば読める
+const NOTE_MAX = 140;
+// マイルストーンの目盛りは、終わったものから順に並べる
+const SEG_ORDER = ["done", "review", "doing", "blocked", "todo"];
+// マイルストーンは目立たせない。目標の文はカードに出さず、乗せたときの説明（title）にだけ出す
+// マイルストーンの目盛りのコマの数の上限。タスクが多いと、コマの枠と隙間だけで列の幅を超えるので、何件かずつまとめる
+const SEG_MAX = 24;
+const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const CUTIN_MS = 2600;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
@@ -231,6 +168,71 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 const fmt = (iso) => new Date(iso).toLocaleString("ja-JP", { dateStyle: "short", timeStyle: "short" });
+const ago = (iso) => {
+  const d = new Date(iso);
+  const sec = (Date.now() - d.getTime()) / 1000;
+  if (sec < 60) return "たった今";
+  if (sec < 3600) return `${Math.floor(sec / 60)}分前`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}時間前`;
+  if (sec < 86400 * 7) return `${Math.floor(sec / 86400)}日前`;
+  return d.toLocaleDateString("ja-JP", d.getFullYear() === new Date().getFullYear() ? { month: "numeric", day: "numeric" } : { dateStyle: "short" });
+};
+const timeAgo = (iso) => {
+  const node = el("time", { className: "ago", dateTime: iso, textContent: ago(iso), title: `更新 ${fmt(iso)}` });
+  node.dataset.at = iso;
+  return node;
+};
+// 経過時間と時計は、描き直しを待たずに進める
+setInterval(() => { for (const t of document.querySelectorAll("time.ago[data-at]")) t.textContent = ago(t.dataset.at); }, 30_000);
+function tickClock() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  $("clock").replaceChildren(`${pad(d.getHours())}:${pad(d.getMinutes())}`, el("small", { textContent: `${d.getMonth() + 1}.${d.getDate()} ${WEEKDAYS[d.getDay()]}` }));
+}
+tickClock();
+setInterval(tickClock, 15_000);
+
+// ---- 設定 ----
+$("theme-options").append(...THEMES.map((t) => {
+  const input = el("input", { type: "radio", name: "theme", value: t.id });
+  input.onchange = () => { localStorage.setItem(THEME_KEY, t.id); applyTheme(t.id); replayEntrance = true; if (data) render(); };
+  return el("label", {}, input, ` ${t.label}`, el("small", { textContent: t.scheme === "dark" ? "暗い" : "明るい" }));
+}));
+$("open-settings").onclick = () => {
+  for (const r of document.querySelectorAll('#settings input[name="theme"]')) r.checked = r.value === document.documentElement.dataset.theme;
+  for (const r of document.querySelectorAll('#settings input[name="font-size"]')) r.checked = r.value === storedFontSize();
+  $("settings").showModal();
+};
+for (const r of document.querySelectorAll('#settings input[name="font-size"]')) {
+  r.onchange = () => { localStorage.setItem(FONT_SIZE_KEY, r.value); applyFontSize(r.value); };
+}
+// ほかの画面でテーマを変えたら、描き直して入ってくる動きも新しいテーマにする
+addEventListener("storage", (e) => { if (e.key === THEME_KEY && data) { replayEntrance = true; render(); } });
+
+let data = null;
+let filter = null; // 選択中のマイルストーン ID
+const SHOW_DONE_MILESTONES_KEY = "devboard-show-done-milestones";
+let showDoneMilestones = localStorage.getItem(SHOW_DONE_MILESTONES_KEY) === "true";
+const limits = new Map(); // 一覧ごとに開いた件数。変更の通知で描き直しても保つ
+
+// 一覧やカードに入れるため、Markdown を記号のない 1 行の文にする
+const inlineText = (items) => items.map((n) => (n.type === "text" || n.type === "code" ? n.text : inlineText(n.children))).join("");
+const blockText = (b) => {
+  switch (b.type) {
+    case "heading": return inlineText(b.content);
+    case "paragraph": return b.lines.map(inlineText).join(" ");
+    case "list": return b.items.map((item) => item.map(blockText).join(" ")).join(" / ");
+    case "quote": return b.children.map(blockText).join(" ");
+    case "code": return b.text;
+    default: return "";
+  }
+};
+const plainText = (md) => parseMarkdown(md).map(blockText).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max)}…` : text);
+const lastNote = (t) => clip(plainText(t.notes.at(-1)?.text ?? ""), NOTE_MAX);
+
+// このタスクを依存先に挙げているタスク（終わったものも含む）
+const dependentsOf = (id) => data.tasks.filter((t) => t.dependsOn.includes(id));
 
 const inlineNodes = (items) => items.map((n) => {
   switch (n.type) {
@@ -263,7 +265,8 @@ function openDetail(title, body) {
   $("detail").scrollTop = 0;
 }
 
-const statusColor = (status) => `--c: var(--${status === "cancelled" ? "todo" : status})`;
+// ---- タスクの詳細 ----
+const statusColor = (status) => `--c: var(--st-${status === "cancelled" ? "todo" : status})`;
 const taskDialog = $("task");
 let viewing = null; // 開いているタスクの ID
 
@@ -294,6 +297,7 @@ function renderTaskView(task) {
     ["マイルストーン", task.milestone && [milestone ? `${milestone.id} ${milestone.title}` : task.milestone]],
     ["親タスク", task.parent && [taskLink(task.parent)]],
     ["依存", task.dependsOn.length && task.dependsOn.map(taskLink), "stack"],
+    ["待っているタスク", dependentsOf(task.id).map((t) => taskLink(t.id)), "stack"],
     ["子タスク", task.children.length && task.children.map(taskLink), "stack"],
     ["ラベル", task.labels.length && task.labels.map((l) => el("span", { className: "tag", textContent: l }))],
     ["ブランチ", task.branch && [el("code", { textContent: task.branch })]],
@@ -301,7 +305,7 @@ function renderTaskView(task) {
     ["登録", [`${task.createdBy === "user" ? "あなた" : "AI"} · ${fmt(task.created)}`]],
     ["更新", [fmt(task.updated)]],
   ];
-  $("view-props").replaceChildren(...props.filter(([, value]) => value).flatMap(([label, value, className = ""]) =>
+  $("view-props").replaceChildren(...props.filter(([, value]) => value && value.length !== 0).flatMap(([label, value, className = ""]) =>
     [el("dt", { textContent: label }), el("dd", { className }, ...value)]));
   $("view-description").replaceChildren(...(task.description.trim()
     ? markdownNodes(task.description)
@@ -337,13 +341,15 @@ for (const dialog of document.querySelectorAll("dialog")) {
   });
 }
 
-function pagedList(key, size, items) {
-  return page(items, limits.get(key) ?? size.first);
+// ---- 一覧の省略 ----
+function pagedList(key, items) {
+  return page(items, limits.get(key) ?? LIST_SIZE[key].first);
 }
 
 // 省略した一覧の下に置く「さらに表示」と「たたむ」
-function pager(key, size, { shown, rest }) {
-  const button = (label, onclick) => el("button", { type: "button", className: "secondary", textContent: label, onclick });
+function pager(key, { shown, rest }) {
+  const size = LIST_SIZE[key];
+  const button = (label, onclick) => el("button", { type: "button", textContent: label, onclick });
   const buttons = [
     ...(rest ? [button(`さらに表示（残り ${rest} 件）`, () => { limits.set(key, nextLimit(shown.length, size.step, shown.length + rest)); render(); })] : []),
     ...(shown.length > size.first ? [button("たたむ", () => { limits.delete(key); render(); })] : []),
@@ -351,104 +357,323 @@ function pager(key, size, { shown, rest }) {
   return buttons.length ? [el("div", { className: "pager" }, ...buttons)] : [];
 }
 
+// ---- 関係するタスクの浮き札 ----
+// カードにマウスを乗せると、つながるタスクのカードに印を付け、カードの下にその一覧を出す。
+// 印を付けるカードが「さらに表示」の先にあっても、一覧のほうで分かる
+const HOVER_LIST_MAX = 6;
+let hovered = null; // マウスを乗せているタスクの ID。描き直しても保つ
+const hoverCard = el("div", { className: "hovercard", role: "tooltip", hidden: true });
+document.body.append(hoverCard);
+const hideHoverCard = () => { hoverCard.hidden = true; };
+addEventListener("scroll", hideHoverCard, { passive: true });
+$("page").addEventListener("scroll", hideHoverCard, { passive: true });
+
+const relationsOf = (t) => [
+  ["親タスク", t.parent ? [t.parent] : []],
+  ["子タスク", t.children],
+  ["依存", t.dependsOn],
+  ["待っているタスク", dependentsOf(t.id).map((d) => d.id)],
+].filter(([, ids]) => ids.length);
+
+function hoverItem(id) {
+  const t = data.tasks.find((x) => x.id === id);
+  return el("div", { className: "item", style: statusColor(t?.status ?? "todo") },
+    el("span", { className: "id", textContent: id }),
+    el("span", { className: "name", textContent: t ? t.title : "（見つからない）" }),
+    ...(t ? [el("span", { className: "st", textContent: STATUS_LABEL[t.status] })] : []));
+}
+
+function markRelated() {
+  for (const n of document.querySelectorAll("main .related")) n.classList.remove("related");
+  hoverCard.hidden = true;
+  const t = hovered && data.tasks.find((x) => x.id === hovered);
+  const card = t && document.querySelector(`main [data-id="${t.id}"]`);
+  const relations = t ? relationsOf(t) : [];
+  if (!card || !relations.length) return;
+  const ids = new Set(relations.flatMap(([, ids]) => ids));
+  for (const n of document.querySelectorAll("main [data-id]")) if (ids.has(n.dataset.id)) n.classList.add("related");
+
+  hoverCard.replaceChildren(...relations.map(([label, ids]) => el("section", {},
+    el("h5", { textContent: `${label}${ids.length > 1 ? ` ${ids.length}` : ""}` }),
+    ...ids.slice(0, HOVER_LIST_MAX).map(hoverItem),
+    ...(ids.length > HOVER_LIST_MAX ? [el("div", { className: "more", textContent: `ほか ${ids.length - HOVER_LIST_MAX} 件` })] : []))));
+  hoverCard.hidden = false;
+  // カードの下に出す。下に入りきらなければ上に出す
+  const r = card.getBoundingClientRect();
+  const { width, height } = hoverCard.getBoundingClientRect();
+  hoverCard.style.left = `${Math.max(8, Math.min(r.left, innerWidth - width - 8))}px`;
+  hoverCard.style.top = `${r.bottom + 6 + height <= innerHeight ? r.bottom + 6 : Math.max(8, r.top - height - 6)}px`;
+}
+
+function hover(id) {
+  hovered = id;
+  markRelated();
+}
+
+// タスクのカードを開けるようにし、マウスを乗せたらつながるタスクを出す
+function asTask(node, t) {
+  node.dataset.id = t.id;
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  node.onclick = () => { hover(null); showTask(t.id); };
+  node.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hover(null); showTask(t.id); } };
+  node.onmouseenter = (e) => { if (e.buttons === 0) hover(t.id); };
+  node.onmouseleave = () => hover(null);
+  return node;
+}
+
+// マイルストーンの目盛り。タスクは終わったものから順に並んでいる。SEG_MAX 件までは 1 件 1 コマ、
+// それより多ければ SEG_MAX コマに等分し、全部終わったコマは done、作業中か確認待ちを含むコマは doing にする
+function segments(tasks) {
+  const count = Math.min(tasks.length, SEG_MAX);
+  return Array.from({ length: count }, (_, i) => {
+    const part = tasks.slice(Math.floor((i * tasks.length) / count), Math.floor(((i + 1) * tasks.length) / count));
+    const className = part.every((t) => t.status === "done") ? "done" : part.some((t) => ["doing", "review"].includes(t.status)) ? "doing" : "";
+    return el("i", { className, title: part.length === 1 ? `${part[0].id} ${part[0].title}` : `${part[0].id}〜${part.at(-1).id}（${part.length} 件）` });
+  });
+}
+
+// ---- 描画 ----
+// 入ってくる動き（.rise）は、開いた直後・テーマを変えたとき・新しく現れたカードだけに出す。
+// 変更の通知のたびに描き直すので、前からあるカードは動きを先送りして終えた形で置き、続けて揺れる動きだけを残す
+let seen = new Set(); // 前に描いたカードの鍵
+let nextSeen = new Set();
+let replayEntrance = false;
+const enter = (node, key) => {
+  if (seen.has(key) && !replayEntrance) node.style.animationDelay = "-60s";
+  nextSeen.add(key);
+  return node;
+};
+const chip = (text, className = "", title = "") => el("span", { className: `chip ${className}`.trim(), textContent: text, title });
+const none = (text) => el("div", { className: "none", textContent: text });
+
 function render() {
   const { project, tasks, decisions, git, errors } = data;
-  $("name").textContent = project.name;
+  nextSeen = new Set();
   document.title = `${project.name} devboard`;
-  $("git").textContent = git.branch ? `${git.branch}${git.dirty ? ` · 未コミット ${git.dirty}` : ""}` : "";
+  $("logo").replaceChildren(...[...project.name.toUpperCase()].map((c, i) => el("span", { textContent: c, style: `--k:${i}` })));
+  $("logo").setAttribute("aria-label", project.name);
+  $("branch").hidden = !git.branch;
+  $("branch").replaceChildren(el("span", { textContent: git.branch ?? "" }), ...(git.dirty ? [el("em", { textContent: `未コミット ${git.dirty}` })] : []));
   $("errors").textContent = errors.join("\n");
 
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const isFinished = (id) => FINISHED.includes(byId.get(id)?.status);
+  // 終わっていない依存先として自分を待っている、終わっていないタスク
+  const waiters = new Map();
+  for (const t of tasks) {
+    if (FINISHED.includes(t.status)) continue;
+    for (const w of t.waitingOn) waiters.set(w.id, [...(waiters.get(w.id) ?? []), t.id]);
+  }
+  const of = (status) => tasks.filter((t) => t.status === status);
+  const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
+  const shownOf = (status) => shown.filter((t) => t.status === status)
+    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || b.updated.localeCompare(a.updated));
+  const crumb = (t) => {
+    if (!t.parent) return [];
+    const parent = byId.get(t.parent);
+    return [el("span", { className: "crumb", textContent: `${parent ? parent.title : t.parent} ›`, title: `親タスク ${t.parent}${parent ? ` ${parent.title}` : ""}` })];
+  };
+  // タスクの札。子タスクの数は、進行中のカードでは目盛り（kids）で出すので札にしない
+  const chipsOf = (t, { kids = false, time = false } = {}) => {
+    const blocking = waiters.get(t.id) ?? [];
+    const doneKids = t.children.filter(isFinished).length;
+    return el("span", { className: "chips" },
+      ...(t.priority === "high" ? [chip("優先", "solid")] : []),
+      ...(t.milestone && !filter ? [chip(t.milestone)] : []),
+      ...t.labels.map((l) => chip(l)),
+      ...(t.waitingOn.length ? [chip(`待ち ${t.waitingOn.map((w) => w.id).join(", ")}`, "solid")] : []),
+      ...(blocking.length ? [chip(blocking.length === 1 ? `止めている ${blocking[0]}` : `止めている ${blocking.length} 件`, "", blocking.join(", "))] : []),
+      ...(t.children.length && !kids ? [chip(`子 ${doneKids}/${t.children.length}`)] : []),
+      ...(t.closable ? [chip("閉じられる", "", "子タスクがすべて終わっている")] : []),
+      ...(time ? [el("span", { className: "chip" }, timeAgo(t.updated))] : []));
+  };
+
+  // 数の帯。絞り込みによらず、ボード全体の数
+  const live = tasks.filter((t) => t.status !== "cancelled");
+  const stat = (className, d, value, label) => enter(el("div", { className: `stat ${className} rise`, style: `--d:${d}` }, el("b", { textContent: value }), el("span", { textContent: label })), `stat:${label}`);
+  $("stats").replaceChildren(
+    stat("hot", 0, of("doing").length, "進行中"),
+    stat("warn", 1, of("review").length + of("blocked").length, "見てほしい"),
+    stat("", 2, of("todo").length, "残り"),
+    stat("dim", 3, `${of("done").length}/${live.length}`, "完了"),
+  );
+
+  // 進行中
+  const doing = shownOf("doing");
+  $("now").replaceChildren(...(doing.length ? doing.map((t, i) => {
+    const note = lastNote(t);
+    return asTask(enter(el("article", { className: "op rise", style: `--d:${i + 2}` },
+      el("div", { className: "face" },
+        el("span", { className: "bigid", textContent: t.id.replace(/^T-/, "") }),
+        el("div", {},
+          el("span", { className: "stamp", textContent: t.id }),
+          chipsOf(t, { kids: true }),
+          ...(t.children.length ? [el("span", { className: "kids", title: `子タスク ${t.children.filter(isFinished).length}/${t.children.length}` },
+            ...t.children.map((id) => el("i", { className: isFinished(id) ? "on" : "" })))] : [])),
+        el("h3", {}, ...crumb(t), t.title),
+        ...(note ? [el("div", { className: "bubble", textContent: note })] : []),
+        el("div", { className: "foot" }, ...(t.branch ? [el("span", { className: "br", textContent: t.branch })] : []), timeAgo(t.updated)))), `now:${t.id}`), t);
+  }) : [none("作業中のタスクはない")]));
+
+  // マイルストーン。押すと、その中のタスクだけに絞り込む
   const doneMilestones = project.milestones.filter((m) => m.status === "done").length;
-  const toggle = $("toggle-done-milestones");
-  toggle.hidden = doneMilestones === 0;
-  toggle.textContent = showDoneMilestones ? "完了を隠す" : `完了を表示（${doneMilestones}）`;
-  toggle.setAttribute("aria-pressed", String(showDoneMilestones));
-  toggle.onclick = () => {
+  const listed = project.milestones.filter((m) => showDoneMilestones || m.status !== "done");
+  const msNodes = listed.map((m, i) => {
+    // 中止したタスクは、進み具合の分母に入れない
+    const mine = tasks.filter((t) => t.milestone === m.id && t.status !== "cancelled")
+      .sort((a, b) => SEG_ORDER.indexOf(a.status) - SEG_ORDER.indexOf(b.status));
+    const done = mine.filter((t) => t.status === "done").length;
+    const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
+    const node = el("div", { className: `ms ${m.status} rise`, style: `--d:${i + 3}`, tabIndex: 0, role: "button",
+      title: `${m.id} ${m.title}（${done}/${mine.length}）${m.goal ? `\n${m.goal}` : ""}` },
+      el("div", { className: "row1" },
+        el("span", { className: "mid", textContent: m.id }),
+        el("span", { className: "title", textContent: m.title }),
+        el("span", { className: "state", textContent: { planned: "予定", active: "進行中", done: "完了" }[m.status] }),
+        el("span", { className: "pct" }, String(pct), el("small", { textContent: "%" }))),
+      el("div", { className: "segs" }, ...segments(mine)));
+    enter(node, `ms:${m.id}`);
+    node.setAttribute("aria-pressed", String(filter === m.id));
+    const toggle = () => { filter = filter === m.id ? null : m.id; render(); };
+    node.onclick = toggle;
+    node.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
+    return node;
+  });
+  const toggleDone = el("button", { type: "button", className: "ms-more",
+    textContent: showDoneMilestones ? "完了を隠す" : `完了 ${doneMilestones}`, title: showDoneMilestones ? "" : `完了したマイルストーン ${doneMilestones} 件も出す` });
+  toggleDone.setAttribute("aria-pressed", String(showDoneMilestones));
+  toggleDone.onclick = () => {
     showDoneMilestones = !showDoneMilestones;
     localStorage.setItem(SHOW_DONE_MILESTONES_KEY, String(showDoneMilestones));
     if (!showDoneMilestones && project.milestones.find((m) => m.id === filter)?.status === "done") filter = null;
     render();
   };
-  const listed = project.milestones.filter((m) => showDoneMilestones || m.status !== "done");
-  $("milestones").replaceChildren(...listed.map((m) => {
-    const mine = tasks.filter((t) => t.milestone === m.id);
-    const done = mine.filter((t) => t.status === "done").length;
-    const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
-    const label = { planned: "予定", active: "進行中", done: "完了" }[m.status];
-    const node = el("button", { className: "ms", type: "button" },
-      el("div", { className: "head" }, `${m.id} ${m.title}`, el("span", { className: `tag ${m.status}`, textContent: label })),
-      el("div", { className: "goal", textContent: m.goal }),
-      el("div", { className: "bar", title: `${done}/${mine.length}` }, el("i", { style: `width:${pct}%` })),
-    );
-    node.setAttribute("aria-pressed", String(filter === m.id));
-    node.onclick = () => { filter = filter === m.id ? null : m.id; render(); };
+  $("milestones").replaceChildren(...(msNodes.length ? msNodes : [none("マイルストーンはない")]), ...(doneMilestones ? [toggleDone] : []));
+
+  // 確認待ち・止まっている
+  const reviewCard = (t, i) => {
+    const note = lastNote(t);
+    return asTask(enter(el("article", { className: "check rise", style: `--d:${i + 4}` },
+      el("span", { className: "seal" }),
+      el("div", { className: "label" }),
+      el("div", { className: "card-id", textContent: t.id }),
+      el("div", { className: "card-title" }, ...crumb(t), t.title),
+      ...(note ? [el("div", { className: "reason", textContent: note })] : []),
+      chipsOf(t, { time: true })), `alert:${t.id}`), t);
+  };
+  const blockedCard = (t, i) => {
+    const reason = t.stuck ? `進められない: ${t.stuck}` : lastNote(t);
+    return asTask(enter(el("article", { className: "hazard rise", style: `--d:${i + 5}` },
+      el("div", { className: "face" },
+        el("div", { className: "label" }),
+        el("div", { className: "card-id", textContent: t.id }),
+        el("div", { className: "card-title" }, ...crumb(t), t.title),
+        ...(reason ? [el("div", { className: "reason", textContent: reason })] : []),
+        chipsOf(t, { time: true }))), `alert:${t.id}`), t);
+  };
+  const alerts = [...shownOf("review").map(reviewCard), ...shownOf("blocked").map(blockedCard)];
+  $("alerts").replaceChildren(...(alerts.length ? alerts : [none("確認待ちも止まっているタスクもない")]));
+
+  // 次にやる順。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く
+  const todo = shown.filter((t) => t.status === "todo")
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id));
+  const pagedTodo = pagedList("queue", todo);
+  $("queue").replaceChildren(...pagedTodo.shown.map((t, i) => {
+    const meta = [
+      t.id,
+      ...(t.milestone && !filter ? [t.milestone] : []),
+      ...t.labels,
+      ...(t.stuck ? [`進められない: ${t.stuck}`] : t.waitingOn.length ? [`待ち ${t.waitingOn.map((w) => w.id).join(", ")}`] : []),
+    ].join(" · ");
+    const first = i === 0 && t.order != null;
+    return asTask(enter(el("li", { className: `rise${first ? " first" : ""}${t.priority === "low" ? " low" : ""}`, style: `--i:${Math.min(i, 8)}; --d:${i + 5}` },
+      el("span", { className: "num", textContent: t.order ?? "–", title: t.order == null ? "並べられない（子を持つか、進められない）" : "着手する順" }),
+      el("div", { className: "plate" }, el("span", { className: "t" }, ...crumb(t), t.title), el("span", { className: "m", textContent: meta })),
+      t.priority === "high" ? el("span", { className: "burst", textContent: "優先" }) : el("span")), `queue:${t.id}`), t);
+  }));
+  if (!todo.length) $("queue").replaceChildren(el("li", { className: "none", textContent: "未着手のタスクはない" }));
+  $("queue-pager").replaceChildren(...pager("queue", pagedTodo));
+
+  // 終わったもの。新しい順
+  const finished = shown.filter((t) => FINISHED.includes(t.status)).sort((a, b) => b.updated.localeCompare(a.updated));
+  const pagedFinished = pagedList("cleared", finished);
+  $("cleared-n").textContent = `×${shown.filter((t) => t.status === "done").length}`;
+  $("cleared").replaceChildren(...(finished.length ? pagedFinished.shown.map((t, i) => asTask(enter(el("article", { className: `tile ${t.status} rise`, style: `--d:${Math.min(i, 12) + 6}` },
+    el("div", { className: "card-id", textContent: [t.id, ...(t.milestone && !filter ? [t.milestone] : [])].join("  ") }),
+    el("div", { className: "tt", textContent: t.title }),
+    timeAgo(t.updated),
+    el("span", { className: "seal" })), `cleared:${t.id}`), t)) : [none("まだない")]));
+  $("cleared-pager").replaceChildren(...pager("cleared", pagedFinished));
+
+  // 決定記録。新しい順
+  const pagedFiles = pagedList("files", decisions.slice().reverse());
+  $("files").replaceChildren(...(decisions.length ? pagedFiles.shown.map((d, i) => {
+    const node = enter(el("article", { className: "file rise", style: `--d:${Math.min(i, 8) + 8}`, tabIndex: 0, role: "button" },
+      el("span", { className: "no", textContent: `No.${String(d.number).padStart(4, "0")}` }),
+      el("div", { className: "ft", textContent: d.title }),
+      el("div", { className: "fm" }, chip(d.status, d.status === "採用" ? "solid" : ""), el("span", { textContent: d.date }))), `file:${d.number}`);
+    node.onclick = () => openDetail(d.title, d.body);
+    node.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(d.title, d.body); } };
     return node;
-  }));
+  }) : [none("なし")]));
+  $("files-pager").replaceChildren(...pager("files", pagedFiles));
 
-  const shown = filter ? tasks.filter((t) => t.milestone === filter) : tasks;
-  $("board-title").textContent = filter ? `タスク（${filter} のみ）` : "タスク";
-  const inColumnOf = (status) => (t) => t.status === status || (status === "done" && t.status === "cancelled");
-  $("status-tabs").replaceChildren(...COLUMNS.map(([status, label]) => {
-    const tab = el("button", { type: "button", role: "tab", style: `--c: var(--${status})` },
-      label, el("span", { className: "n", textContent: shown.filter(inColumnOf(status)).length }));
-    tab.setAttribute("aria-selected", String(status === mobileStatus));
-    tab.onclick = () => { mobileStatus = status; render(); };
-    return tab;
-  }));
-  $("board").replaceChildren(...COLUMNS.map(([status, label]) => {
-    const inColumn = inColumnOf(status);
-    // 未着手は着手する順（order）。並べられないもの（子を持つ親や、進められないもの）は後ろに ID 順で置く
-    const items = shown.filter(inColumn).sort((a, b) =>
-      status === "todo"
-        ? (a.order ?? Infinity) - (b.order ?? Infinity) || a.id.localeCompare(b.id)
-        : b.updated.localeCompare(a.updated));
-    const paged = pagedList(status, LIST_SIZE.column, items);
-    return el("div", { className: `col${status === mobileStatus ? " current" : ""}`, style: `--c: var(--${status})` },
-      el("h3", {}, label, el("span", { className: "n", textContent: items.length })),
-      el("div", { className: "cards" }, ...(items.length ? paged.shown.map((t) => {
-        const card = el("div", { className: `card ${t.status}`, tabIndex: 0, role: "button" },
-          el("div", { className: "id", textContent: t.id }),
-          el("div", { className: "title", textContent: t.title }),
-          el("div", { className: "meta" },
-            ...(t.status === "cancelled" ? [el("span", { className: "tag", textContent: "中止" })] : []),
-            ...(t.priority === "high" ? [el("span", { className: "tag high", textContent: "優先" })] : []),
-            ...(t.parent ? [el("span", { className: "tag", textContent: `↳ ${t.parent}` })] : []),
-            ...(t.children.length ? [el("span", { className: "tag", textContent: `子 ${t.children.length}` })] : []),
-            ...(t.waitingOn.length ? [el("span", { className: "tag wait", textContent: `待ち ${t.waitingOn.map((w) => w.id).join(", ")}` })] : []),
-            ...(t.milestone ? [el("span", { className: "tag", textContent: t.milestone })] : []),
-            ...t.labels.map((l) => el("span", { className: "tag", textContent: l })),
-            ...(t.branch ? [el("span", { className: "tag", textContent: t.branch })] : []),
-          ),
-        );
-        card.onclick = () => showTask(t.id);
-        card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showTask(t.id); } };
-        return card;
-      }) : [el("div", { className: "empty", textContent: "なし" })])),
-      ...pager(status, LIST_SIZE.column, paged),
-    );
-  }));
+  // 下を流れるコミット。途切れないよう 2 回並べ、2 回目は読み上げない
+  const commit = (c) => el("span", { title: c.date }, el("b", { textContent: c.hash }), c.subject);
+  const commits = git.commits.map(commit);
+  $("ticker").replaceChildren(...(commits.length
+    ? [...commits, ...git.commits.map((c) => Object.assign(commit(c), { className: "dup", ariaHidden: "true" }))]
+    : [el("span", { textContent: "コミットなし" })]));
 
-  const pagedDecisions = pagedList("decisions", LIST_SIZE.decisions, decisions.slice().reverse());
-  $("decisions").replaceChildren(...(decisions.length ? pagedDecisions.shown.map((d) => {
-    const row = el("button", { type: "button" },
-      el("span", { className: "num", textContent: String(d.number).padStart(4, "0") }),
-      el("span", { className: "title", textContent: d.title }),
-      el("span", { className: "tag", textContent: d.status }),
-      el("span", { className: "date", textContent: d.date }),
-    );
-    row.onclick = () => openDetail(d.title, d.body);
-    return row;
-  }) : [el("div", { className: "empty", style: "padding: 8px 12px", textContent: "なし" })]));
-  $("decisions-pager").replaceChildren(...pager("decisions", LIST_SIZE.decisions, pagedDecisions));
+  seen = nextSeen;
+  replayEntrance = false;
 
-  $("commits").replaceChildren(...(git.commits.length
-    ? git.commits.map((c) => el("li", { textContent: `${c.hash} ${c.date} ${c.subject}` }))
-    : [el("li", { textContent: "コミットなし" })]));
-
+  // AI の更新で描き直しても、マウスを乗せているカードの印と一覧を消さない
+  if (hovered) markRelated();
   // 表示中のタスクを AI が更新したら、開いたまま中身を差し替える
   const viewed = tasks.find((t) => t.id === viewing);
   if (viewed) renderTaskView(viewed);
 }
+
+// ---- 終わったときの演出 ----
+// 変更の通知で、前に見たときは終わっていなかったタスクが完了になったら出す。開いた直後の読み込みでは出さない
+let lastStatus = null;
+const cutinQueue = [];
+let cutinPlaying = false;
+function playCutin() {
+  if (cutinPlaying || !cutinQueue.length) return;
+  cutinPlaying = true;
+  const t = cutinQueue.shift();
+  $("cutin-what").replaceChildren(el("b", { textContent: t.id }), t.title);
+  const c = $("cutin");
+  c.classList.remove("show");
+  void c.offsetWidth; // 続けて出すとき、動きを最初からやり直す
+  c.classList.add("show");
+  setTimeout(() => { c.classList.remove("show"); cutinPlaying = false; playCutin(); }, CUTIN_MS);
+}
+function celebrate(tasks) {
+  if (lastStatus) {
+    for (const t of tasks) if (t.status === "done" && lastStatus.has(t.id) && lastStatus.get(t.id) !== "done") cutinQueue.push(t);
+    playCutin();
+  }
+  lastStatus = new Map(tasks.map((t) => [t.id, t.status]));
+}
+
+// 無重力: マウスの位置で画面を傾ける（-1〜1）
+addEventListener("mousemove", (e) => {
+  if (document.documentElement.dataset.theme !== "motion") return;
+  const root = document.documentElement.style;
+  root.setProperty("--mx", (e.clientX / innerWidth * 2 - 1).toFixed(3));
+  root.setProperty("--my", (e.clientY / innerHeight * 2 - 1).toFixed(3));
+});
+// 縦書き: 本文は横に流れるので、縦のホイールを横の送りに変える（下へ回すと左へ進む）
+addEventListener("wheel", (e) => {
+  if (document.documentElement.dataset.theme !== "tategaki" || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  if (e.target.closest?.("dialog")) return;
+  e.preventDefault();
+  $("page").scrollBy({ left: -e.deltaY });
+}, { passive: false });
 
 // 活動の画面の図から ?task=T-NNN で来たら、そのタスクを開く
 let requestedTask = new URLSearchParams(location.search).get("task");
@@ -457,6 +682,7 @@ async function load() {
   const res = await fetch("/api/snapshot");
   data = await res.json();
   render();
+  celebrate(data.tasks);
   if (requestedTask) {
     showTask(requestedTask);
     requestedTask = null;
