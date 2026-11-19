@@ -1,12 +1,15 @@
 // 開発ダッシュボードの HTTP サーバ。127.0.0.1 のみで待ち受ける。
 //   GET /               ボードの画面（public/index.html）
 //   GET /activity       活動の画面（public/activity.html）
-//   GET /base.css, /theme.js, /markdown.js, /paging.js  画面が共有するスタイル・テーマ・Markdown の解析器・一覧の省略（public/）
+//   GET /base.css, /theme.js, /markdown.js, /paging.js, /project.js  画面が共有するスタイル・テーマ・Markdown の解析器・一覧の省略・プロジェクトの切り替え（public/）
 //   GET /board.css, /themes/<id>.css  ボードの画面の土台とテーマ（public/themes/）
+//   GET /api/projects   切り替えて見られるプロジェクトの一覧（projects.ts）。先頭が、起動したプロジェクト
 //   GET /api/snapshot   ボードの全データ
 //   GET /api/activity?days=N  直近 N 日の活動の集計（0 は全期間。activity.ts）
 //   GET /api/events     変更通知（Server-Sent Events）。ボード（SQLite）と決定記録のディレクトリと .git の変更で送る
 //   GET /api/hosts      許可している Host の一覧（tailscale.ts が確認に使う）
+// snapshot・activity・events は ?project=<id> で、起動したプロジェクトではなく、ほかのプロジェクトのものを返す。
+// id は /api/projects に出るものだけを受け付け、それ以外は 404 にする（パスを組み立てて外へ出られないようにする）
 // ポートは DEVBOARD_PORT。指定が無ければ 4848 から、ほかのプロジェクトのダッシュボードが使っていない番号を探す。
 // 使った URL は .dev/devboard.json に記録し、launcher.ts と tailscale.ts はそれを見る。
 // devboard のコードが更新されたら（リポジトリの HEAD が変わったら）、同じポートで新しいコードのサーバに立て直す
@@ -18,10 +21,12 @@ import { execFile, spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { readdirSync, readFileSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import { loadActivity } from "./activity-sources.ts";
 import { board, latestSeq } from "./board-db.ts";
+import { knownRoots, listProjects } from "./projects.ts";
+import { inProject } from "./repo-root.ts";
 import { tailnetName } from "./tailnet.ts";
 import { decisionsDir, repoRoot, snapshot } from "./store.ts";
 
@@ -80,12 +85,11 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
 // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
 const configuredPort = () => process.env.DEVBOARD_PORT ?? process.env.NAGAYA_DEV_PORT;
 
-// fallback が真なら、port が使われているときに次の番号を順に試す。ポートを指定されたときは、その番号だけを使う
-export function startServer(
-  port = Number(configuredPort() ?? DEFAULT_PORT),
-  remote = remoteHosts(),
-  fallback = configuredPort() === undefined,
-) {
+// あるプロジェクトの中で fn を動かす（repo-root.ts の inProject）。起動したプロジェクトなら、そのまま動かす
+type Run = <T>(fn: () => T) => T;
+
+// 1 つのプロジェクトの変更を見て、見ている画面に知らせる
+function watchProject(run: Run) {
   const clients = new Set<ServerResponse>();
   let timer: NodeJS.Timeout | undefined;
 
@@ -98,7 +102,7 @@ export function startServer(
   };
 
   // ボードは SQLite なので、イベントの番号が増えたかを見る
-  const db = board();
+  const db = run(board);
   let seen = latestSeq(db);
   const poll = setInterval(() => {
     const seq = latestSeq(db);
@@ -109,7 +113,7 @@ export function startServer(
   }, BOARD_POLL_MS);
 
   const watchers: FSWatcher[] = [];
-  for (const dir of [decisionsDir(), join(repoRoot(), ".git")]) {
+  for (const dir of run(() => [decisionsDir(), join(repoRoot(), ".git")])) {
     try {
       watchers.push(
         watch(dir, { recursive: true }, (_event, file) => {
@@ -121,6 +125,43 @@ export function startServer(
       // ディレクトリがまだ無い場合は監視しない
     }
   }
+
+  const close = () => {
+    clearTimeout(timer);
+    clearInterval(poll);
+    for (const w of watchers) w.close();
+    for (const res of clients) res.end();
+    clients.clear();
+  };
+  return { clients, close };
+}
+
+// fallback が真なら、port が使われているときに次の番号を順に試す。ポートを指定されたときは、その番号だけを使う
+export function startServer(
+  port = Number(configuredPort() ?? DEFAULT_PORT),
+  remote = remoteHosts(),
+  fallback = configuredPort() === undefined,
+) {
+  // 起動したプロジェクト。?project= がこれか、指定が無ければ、cwd（と DEVBOARD_ROOT・DEVBOARD_DB）から決めたものをそのまま使う
+  const home = basename(repoRoot());
+  const atHome: Run = (fn) => fn();
+
+  // 監視はプロジェクトごと。起動したプロジェクトのものは常に動かし、ほかのものは見ている画面があるあいだだけ動かす
+  const watches = new Map<string, ReturnType<typeof watchProject>>();
+  const watchOf = (id: string, run: Run) => {
+    let w = watches.get(id);
+    if (!w) watches.set(id, (w = watchProject(run)));
+    return w;
+  };
+  watchOf(home, atHome);
+
+  // ?project= から、そのプロジェクトの中で動かす関数。知らない id なら null
+  const projectOf = (url: URL): { id: string; run: Run } | null => {
+    const id = url.searchParams.get("project");
+    if (id === null || id === home) return { id: home, run: atHome };
+    const root = knownRoots().get(id);
+    return root ? { id, run: (fn) => inProject(root, fn) } : null;
+  };
 
   const server = createServer((req, res) => {
     if (!hostAllowed(req, remote)) return send(res, 403, "text/plain", "forbidden host");
@@ -137,23 +178,37 @@ export function startServer(
       case "/theme.js":
       case "/markdown.js":
       case "/paging.js":
+      case "/project.js":
         return send(res, 200, "text/javascript; charset=utf-8", asset(url.pathname.slice(1)));
-      case "/api/activity":
-        return void handleActivity(res, url);
       case "/api/hosts":
         return send(res, 200, "application/json; charset=utf-8", JSON.stringify([...LOOPBACK, ...remote]));
+      case "/api/projects":
+        return send(res, 200, "application/json; charset=utf-8", JSON.stringify(listProjects()));
+      case "/api/activity":
       case "/api/snapshot":
-        return send(res, 200, "application/json; charset=utf-8", JSON.stringify(snapshot()));
-      case "/api/events":
+      case "/api/events": {
+        const project = projectOf(url);
+        if (!project) return send(res, 404, "text/plain; charset=utf-8", "そのプロジェクトのボードは無い");
+        if (url.pathname === "/api/activity") return void project.run(() => handleActivity(res, url));
+        if (url.pathname === "/api/snapshot")
+          return send(res, 200, "application/json; charset=utf-8", JSON.stringify(project.run(snapshot)));
         res.writeHead(200, {
           "content-type": "text/event-stream",
           "cache-control": "no-store",
           connection: "keep-alive",
         });
         res.write(": connected\n\n");
-        clients.add(res);
-        req.on("close", () => clients.delete(res));
+        const watch = watchOf(project.id, project.run);
+        watch.clients.add(res);
+        req.on("close", () => {
+          watch.clients.delete(res);
+          if (project.id !== home && watch.clients.size === 0) {
+            watch.close();
+            watches.delete(project.id);
+          }
+        });
         return;
+      }
       default: {
         const theme = url.pathname.match(/^\/themes\/([a-z-]+\.css)$/)?.[1];
         if (theme && THEME_FILES.has(theme)) return send(res, 200, "text/css; charset=utf-8", asset(`themes/${theme}`));
@@ -176,9 +231,8 @@ export function startServer(
   });
 
   const close = () => {
-    clearInterval(poll);
-    for (const w of watchers) w.close();
-    for (const res of clients) res.end();
+    for (const w of watches.values()) w.close();
+    watches.clear();
     rmSync(instanceFile(), { force: true });
     server.close();
   };

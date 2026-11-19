@@ -55,6 +55,7 @@
   <header class="top">
     <h1 class="logo" id="logo">devboard</h1>
     <nav class="pages" aria-label="画面"><a href="/" aria-current="page">ボード</a><a href="/activity">活動</a></nav>
+    <select class="project-picker" id="project" aria-label="プロジェクト" hidden></select>
     <div class="branch" id="branch"></div>
     <span class="spacer"></span>
     <div class="live" id="live" title="変更を監視中">LIVE</div>
@@ -146,6 +147,7 @@
 <script type="module">
 import { parseMarkdown } from "./markdown.js";
 import { nextLimit, page } from "./paging.js";
+import { setupProjectPicker, withProject } from "./project.js";
 
 const STATUS_LABEL = { todo: "未着手", doing: "作業中", review: "確認待ち", blocked: "ブロック", done: "完了", cancelled: "中止" };
 const LIST_SIZE = { queue: { first: 8, step: 20 }, cleared: { first: 10, step: 30 }, files: { first: 8, step: 20 } };
@@ -679,24 +681,25 @@ addEventListener("wheel", (e) => {
 let requestedTask = new URLSearchParams(location.search).get("task");
 
 async function load() {
-  const res = await fetch("/api/snapshot");
+  const res = await fetch(withProject("/api/snapshot"));
   data = await res.json();
   render();
   celebrate(data.tasks);
   if (requestedTask) {
     showTask(requestedTask);
     requestedTask = null;
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", withProject("/"));
   }
 }
 
 function listen() {
-  const es = new EventSource("/api/events");
+  const es = new EventSource(withProject("/api/events"));
   es.onopen = () => { $("live").classList.add("on"); load(); };
   es.addEventListener("change", load);
   es.onerror = () => $("live").classList.remove("on");
 }
 
+setupProjectPicker($("project"));
 load();
 listen();
 </script>

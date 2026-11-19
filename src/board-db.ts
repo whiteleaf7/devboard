@@ -1,11 +1,11 @@
 // ボードの保存先。git の外の SQLite に、変更をイベントとして追記し、いまの状態の表を同じトランザクションで更新する。
 // どの worktree から使っても同じファイルを読み書きする。
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
-import { repoRoot } from "./repo-root.ts";
+import { repoRoot, scopedRoot } from "./repo-root.ts";
 
 // 書き込みが重なったときに待つ時間。書き込みは数ミリ秒で終わる
 const BUSY_TIMEOUT_MS = 10_000;
@@ -27,15 +27,46 @@ const SCHEMA = `
   CREATE TABLE project (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL);
 `;
 
+// ボードを置くディレクトリ。DEVBOARD_HOME（既定は ~/.devboard）の boards/。全プロジェクトのボードがここに並ぶ
+export function boardsDir(): string {
+  // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
+  const home = process.env.DEVBOARD_HOME;
+  if (home) return join(resolve(home), "boards");
+  // node --test の中から本物のボードに書かないように止める
+  if (process.env.NODE_TEST_CONTEXT)
+    throw new Error("テストでは DEVBOARD_DB に一時ファイルを指定する（本物のボードに書かないため）");
+  return join(homedir(), ".devboard", "boards");
+}
+
+// DEVBOARD_DB で指していない、ボードのディレクトリの本物のボードか
+const atDefaultPlace = () => !scopedRoot() && !process.env.DEVBOARD_DB && !process.env.NAGAYA_BOARD;
+
 export function boardFile(): string {
+  // ダッシュボードがほかのプロジェクトを見せているときは、そのプロジェクトのボード。DEVBOARD_DB はコマンドを打った場所のボードにだけ効く
+  const scoped = scopedRoot();
+  if (scoped) return join(boardsDir(), `${basename(scoped)}.sqlite`);
   // fl-ignore lib/server-only-missing: Next.js ではなく Node で直接動かす開発ツールのため
   // pnpm --filter はパッケージのディレクトリで動くので、相対パスは呼び出したディレクトリ（INIT_CWD）から解決する
   const explicit = process.env.DEVBOARD_DB || process.env.NAGAYA_BOARD;
   if (explicit) return resolve(process.env.INIT_CWD ?? process.cwd(), explicit);
-  // node --test の中から本物のボードに書かないように止める
-  if (process.env.NODE_TEST_CONTEXT)
-    throw new Error("テストでは DEVBOARD_DB に一時ファイルを指定する（本物のボードに書かないため）");
-  return join(homedir(), ".devboard", "boards", `${basename(repoRoot())}.sqlite`);
+  return join(boardsDir(), `${basename(repoRoot())}.sqlite`);
+}
+
+// ボードの隣に置く、プロジェクトのリポジトリの場所（<名前>.root）。ダッシュボードがほかのプロジェクトの決定記録と git を読むのに使う
+export const rootFileOf = (file: string) => file.replace(/\.sqlite$/, "") + ".root";
+
+// ボードの形式は変えず、ボードを開いたプロセスが場所を書いておく。中身が変わったときだけ書き、書けなくてもボードは使える
+function recordRoot(file: string): void {
+  const target = rootFileOf(file);
+  const root = repoRoot();
+  try {
+    if (existsSync(target) && readFileSync(target, "utf8").trim() === root) return;
+    const tmp = `${target}.${process.pid}.tmp`;
+    writeFileSync(tmp, `${root}\n`);
+    renameSync(tmp, target);
+  } catch {
+    // 場所が書けなくても、そのプロジェクトがほかのダッシュボードの切り替えに出ないだけ
+  }
 }
 
 // WAL への切り替えは、待ち時間の設定が効かずにすぐ SQLITE_BUSY を返すことがある（新しいファイルを複数のプロセスが同時に開いたとき）
@@ -60,7 +91,8 @@ export function board(): DatabaseSync {
   const existing = opened.get(file);
   if (existing) return existing;
   mkdirSync(dirname(file), { recursive: true });
-  if (!existsSync(file) && !process.env.DEVBOARD_DB && !process.env.NAGAYA_BOARD) {
+  const real = atDefaultPlace();
+  if (!existsSync(file) && real) {
     const legacy = join(homedir(), ".nagaya-dev", "boards", basename(file));
     if (existsSync(legacy)) {
       const src = new DatabaseSync(legacy, { readOnly: true, timeout: BUSY_TIMEOUT_MS });
@@ -81,6 +113,7 @@ export function board(): DatabaseSync {
       db.exec("PRAGMA user_version = 1");
     });
   }
+  if (real) recordRoot(file);
   opened.set(file, db);
   return db;
 }
