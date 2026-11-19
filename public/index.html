@@ -59,17 +59,17 @@
       <div class="now-list" id="now"></div>
     </section>
     <aside>
-      <h2 class="h"><b>MILESTONE</b><small>マイルストーン</small></h2>
-      <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
+      <h2 class="h"><b>NEXT</b><small>次にやる順</small></h2>
+      <ol class="queue" id="queue"></ol>
+      <div id="queue-pager"></div>
     </aside>
     <section>
       <h2 class="h red"><b>ALERT</b><small>確認待ち・止まっている</small></h2>
       <div class="alert-list" id="alerts"></div>
     </section>
     <aside>
-      <h2 class="h"><b>NEXT</b><small>次にやる順</small></h2>
-      <ol class="queue" id="queue"></ol>
-      <div id="queue-pager"></div>
+      <h2 class="h"><b>MILESTONE</b><small>マイルストーン</small></h2>
+      <div class="ms-list" id="milestones" role="group" aria-label="マイルストーンで絞り込む"></div>
     </aside>
     <section class="span">
       <h2 class="h"><b>CLEARED</b><small>終わったもの</small><span class="n" id="cleared-n"></span></h2>
@@ -140,6 +140,7 @@ const FINISHED = ["done", "cancelled"];
 const NOTE_MAX = 140;
 // マイルストーンの目盛りは、終わったものから順に並べる
 const SEG_ORDER = ["done", "review", "doing", "blocked", "todo"];
+// マイルストーンは目立たせない。目標の文はカードに出さず、乗せたときの説明（title）にだけ出す
 // マイルストーンの目盛りのコマの数の上限。タスクが多いと、コマの枠と隙間だけで列の幅を超えるので、何件かずつまとめる
 const SEG_MAX = 24;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -516,7 +517,6 @@ function render() {
         el("span", { className: "title", textContent: m.title }),
         el("span", { className: "state", textContent: { planned: "予定", active: "進行中", done: "完了" }[m.status] }),
         el("span", { className: "pct" }, String(pct), el("small", { textContent: "%" }))),
-      ...(m.goal ? [el("div", { className: "goal", textContent: m.goal })] : []),
       el("div", { className: "segs" }, ...segments(mine)));
     enter(node, `ms:${m.id}`);
     node.setAttribute("aria-pressed", String(filter === m.id));
