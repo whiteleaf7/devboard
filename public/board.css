@@ -46,11 +46,15 @@ main > * { min-width: 0; }
 .span { grid-column: 1 / -1; }
 .h { margin: 0; }
 .logo { margin: 0; font-size: inherit; font-weight: inherit; }
-.crumb { margin-right: .4em; font-size: .85em; opacity: .75; }
+/* 親タスクの名前。本題より目立たないよう、上に小さく薄い 1 行で出し、長ければ末尾を切る（全文は title） */
+.crumb { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin: 0 0 2px; font-size: .78em; font-weight: normal; opacity: .7; }
 .now-list, .ms-list { display: grid; }
 .alert-list { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
 .queue { list-style: none; padding: 0; margin: 0; display: grid; }
 .queue li { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; }
+/* 1 行で切る親タスクの名前が、札を広げて列からはみ出さないようにする */
+.queue li, .queue li > *, .now-list > *, .alert-list > * { min-width: 0; }
 .cleared { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
 .files { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 30px 22px; }
 .chips { display: inline-flex; gap: 6px; flex-wrap: wrap; vertical-align: middle; }

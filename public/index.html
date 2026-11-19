@@ -469,7 +469,7 @@ function render() {
   const crumb = (t) => {
     if (!t.parent) return [];
     const parent = byId.get(t.parent);
-    return [el("span", { className: "crumb", textContent: `${parent ? parent.title : t.parent} ›`, title: `親タスク ${t.parent}` })];
+    return [el("span", { className: "crumb", textContent: `${parent ? parent.title : t.parent} ›`, title: `親タスク ${t.parent}${parent ? ` ${parent.title}` : ""}` })];
   };
   // タスクの札。子タスクの数は、進行中のカードでは目盛り（kids）で出すので札にしない
   const chipsOf = (t, { kids = false, time = false } = {}) => {
