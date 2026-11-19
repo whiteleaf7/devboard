@@ -42,9 +42,10 @@ AI 自律開発のための開発ボード。タスク・教訓・マイルス�
 
 - プロジェクトは、コマンドを打った場所（サブディレクトリや linked worktree でもよい）の git の main の worktree。別の場所は `DEVBOARD_ROOT` で指す
 - `devboard start` は前面で動き続けて戻らない。`devboard open` はブラウザを開く。AI が自分で打つ必要はなく、ユーザーに見せたいときは `devboard tailscale` を打ち、出た URL を渡す。Tailscale が動いていないときだけ、MCP の `open_dashboard` が返すローカルの URL を渡す
+- ダッシュボード 1 つで、ほかのプロジェクトのボードも見られる。ヘッダーの欄でプロジェクトを選ぶ（URL の `?project=<ディレクトリ名>`）。欄に出るのは、そのプロジェクトで devboard（MCP・`apply`・`show`・`start` など）を一度でも使ったもの。使うとボードの隣の `<ディレクトリ名>.root` にリポジトリの場所が書かれ、ダッシュボードはそこから決定記録と git を読む
 - ダッシュボードは読み取り専用。ボードに書けるのは MCP と `devboard apply` だけ。待ち受けは `127.0.0.1` のみ
 - 動いているダッシュボードは、devboard のコードが更新される（このリポジトリの HEAD が変わる）と、同じポートで新しいコードに立て直す
-- ボードは `~/.devboard/boards/<プロジェクトのディレクトリ名>.sqlite`（`DEVBOARD_DB` で変更可）。プロジェクトの git の外にあり、変更はすべてイベントとして追記する。実験や検証は `devboard snapshot <ファイル>` で写しを取り、`DEVBOARD_DB` をその写しに向けて行う。本物のボードで試さない
+- ボードは `~/.devboard/boards/<プロジェクトのディレクトリ名>.sqlite`（`DEVBOARD_DB` で変更可。`~/.devboard` は `DEVBOARD_HOME` で変更可）。プロジェクトの git の外にあり、変更はすべてイベントとして追記する。実験や検証は `devboard snapshot <ファイル>` で写しを取り、`DEVBOARD_DB` をその写しに向けて行う。本物のボードで試さない
 - 決定記録はプロジェクトの `docs/decisions/NNNN-slug.md`
 - 教訓には、差分から読み取れる引き金（`trigger`: 変えたパスの接頭辞 `paths`、変えた行に現れる語 `words`、当たったときに確かめること `check`）を付けられる（`add_lesson`、あとからは `update_lesson`）。当たった教訓だけが、`devboard checklist`（autodev はコミットのときに出す）と、`paths` の重なるタスクの `get_task` の `checklist` に出る。止めはしない
 - `devboard apply` の JSON は、シェルのシングルクォートで囲む。操作の名前と入力は MCP のツールと同じ

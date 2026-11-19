@@ -81,6 +81,11 @@ main > * { min-width: 0; }
 .top-button, .pager button, .ms-more { font: inherit; font-size: var(--fs-sm); color: inherit; background: transparent; border: 1px solid currentColor;
   border-radius: 4px; padding: 3px 12px; cursor: pointer; opacity: .8; text-shadow: none; }
 .top-button:hover, .pager button:hover, .ms-more:hover { opacity: 1; }
+/* プロジェクトの切り替え。開いた一覧はテーマの色ではなく、明るい面か暗い面（color-scheme）の色にする */
+.project-picker { font: inherit; font-size: var(--fs-sm); color: inherit; background: transparent; border: 1px solid currentColor;
+  border-radius: 4px; padding: 3px 8px; cursor: pointer; opacity: .8; max-width: 16em; text-overflow: ellipsis; }
+.project-picker:hover, .project-picker:focus-visible { opacity: 1; }
+.project-picker option { color: CanvasText; background: Canvas; }
 .pager { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
 .ms-more { justify-self: start; margin-top: 4px; }
 .none { opacity: .65; font-size: var(--fs-sm); padding: 4px 0; }

@@ -30,6 +30,8 @@ header .git { color: var(--sub); font-family: ui-monospace, monospace; font-size
 .pages a:hover { background: var(--panel); }
 .pages a[aria-current="page"] { color: var(--ink); background: var(--panel); border: 1px solid var(--line); font-weight: 600; }
 .pages a:not([aria-current]) { border: 1px solid transparent; }
+.project-picker { font: inherit; font-size: var(--fs-sm); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 4px 8px; cursor: pointer; max-width: 16em; text-overflow: ellipsis; }
 .live { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
 .live.on { background: var(--done); }
 main { padding: 16px 24px 48px; display: grid; gap: 24px; }

@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
-import { repoRoot } from "./repo-root.ts";
+import { repoRoot, scopedRoot } from "./repo-root.ts";
 
 export const CONFIG_FILE = ".devboard.json";
 
@@ -27,10 +27,11 @@ export type ProjectConfig = z.infer<typeof ProjectConfig>;
 const cache = new Map<string, { stamp: string; config: ProjectConfig }>();
 
 // 設定は、コマンドを打った場所から上へたどって最初に見つかったものを使う（linked worktree では、その作業ブランチの設定になる）。
-// 見つからなければ、プロジェクトの根（main の worktree）のもの。DEVBOARD_ROOT で場所を指しているときは、そこだけを見る
+// 見つからなければ、プロジェクトの根（main の worktree）のもの。DEVBOARD_ROOT で場所を指しているときと、
+// ダッシュボードがほかのプロジェクトを見せているとき（inProject）は、そこだけを見る
 function configFile(): string {
   const atRoot = join(repoRoot(), CONFIG_FILE);
-  if (process.env.DEVBOARD_ROOT ?? process.env.NAGAYA_ROOT) return atRoot;
+  if (scopedRoot() ?? process.env.DEVBOARD_ROOT ?? process.env.NAGAYA_ROOT) return atRoot;
   for (let dir = process.cwd(); ; dir = dirname(dir)) {
     const candidate = join(dir, CONFIG_FILE);
     if (existsSync(candidate)) return candidate;

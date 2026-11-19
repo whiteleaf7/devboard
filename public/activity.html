@@ -128,6 +128,7 @@
 <header>
   <h1 id="name">devboard</h1>
   <nav class="pages" aria-label="画面"><a href="/">ボード</a><a href="/activity" aria-current="page">活動</a></nav>
+  <select class="project-picker" id="project" aria-label="プロジェクト" hidden></select>
   <span class="spacer"></span>
   <span class="live" id="live" title="変更を監視中"></span>
 </header>
@@ -186,6 +187,8 @@
 </main>
 <div class="tooltip" id="tooltip" hidden></div>
 <script type="module">
+import { project, setupProjectPicker, withProject } from "./project.js";
+
 const DAYS = [[7, "7日"], [30, "30日"], [0, "全期間"]];
 const METRICS = [["commits", "コミット"], ["prMerged", "PR マージ"], ["tasksDone", "完了タスク"]];
 const METRIC_UNIT = { commits: "コミット", prMerged: "PR マージ", tasksDone: "タスク完了" };
@@ -237,7 +240,7 @@ function renderControls() {
 }
 
 function saveState() {
-  history.replaceState(null, "", `?days=${days}&metric=${metric}${graphMilestone ? `&graph=${graphMilestone}` : ""}`);
+  history.replaceState(null, "", `?days=${days}&metric=${metric}${graphMilestone ? `&graph=${graphMilestone}` : ""}${project ? `&project=${encodeURIComponent(project)}` : ""}`);
   renderControls();
 }
 
@@ -548,7 +551,7 @@ function renderGraph() {
     const finished = isFinished(n);
     const link = el("a", {
       className: `node${n.external ? " external" : ""}${finished ? " finished" : ""}`,
-      href: `/?task=${n.id}`,
+      href: withProject(`/?task=${n.id}`),
       dataset: { id: n.id },
       style: `left: ${x}px; top: ${y}px; width: ${NODE.w}px; height: ${NODE.h}px; --c: ${statusColor(n.status)}`,
     },
@@ -633,7 +636,7 @@ async function load() {
   // 選んだ期間の図がまだ無いときだけ、前の図を薄く残してレイアウトを動かさない。変更の通知での読み直しは薄くしない
   if (data?.range.days !== asked) $("content").classList.add("loading");
   try {
-    const res = await fetch(`/api/activity?days=${asked}`);
+    const res = await fetch(withProject(`/api/activity?days=${asked}`));
     if (!res.ok) throw new Error(await res.text());
     const next = await res.json();
     // 読み込みの間に期間を変えたら、古い期間の結果は描かずに読み直す
@@ -653,7 +656,7 @@ async function load() {
 }
 
 function listen() {
-  const es = new EventSource("/api/events");
+  const es = new EventSource(withProject("/api/events"));
   es.onopen = () => $("live").classList.add("on");
   es.addEventListener("change", load);
   es.onerror = () => $("live").classList.remove("on");
@@ -664,6 +667,7 @@ $("graph-finished").onchange = renderGraph;
 let resizeTimer;
 addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 100); });
 
+setupProjectPicker($("project"));
 renderControls();
 load();
 listen();
